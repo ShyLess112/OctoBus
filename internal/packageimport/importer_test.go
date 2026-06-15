@@ -1265,6 +1265,105 @@ message EchoResponse { string text = 1; }
 	return pkg
 }
 
+type multiServiceTestPackage struct {
+	Root     string
+	Services []multiServiceTestService
+}
+
+type multiServiceTestService struct {
+	ServiceRoot string
+	ID          string
+	NodeEntry   string
+	MethodFull  string
+}
+
+func writeMultiServiceTestPackage(t *testing.T, root string) multiServiceTestPackage {
+	t.Helper()
+	services := []multiServiceTestService{
+		{ServiceRoot: "vendor__alpha", ID: "alpha-service", NodeEntry: "bin/alpha-service.js", MethodFull: "alpha.v1.AlphaService/Call"},
+		{ServiceRoot: "vendor__beta", ID: "beta-service", NodeEntry: "bin/beta-service.js", MethodFull: "beta.v1.BetaService/Call"},
+		{ServiceRoot: "nested/vendor__gamma", ID: "gamma-service", NodeEntry: "bin/gamma-service.js", MethodFull: "gamma.v1.GammaService/Call"},
+	}
+	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bin := map[string]string{}
+	files := []string{"bin", "vendor__alpha", "vendor__beta", "nested"}
+	for _, service := range services {
+		bin[service.ID] = service.NodeEntry
+		writeTestFile(t, filepath.Join(root, filepath.FromSlash(service.NodeEntry)), "#!/bin/sh\n", 0o755)
+		writeMultiServiceRoot(t, root, service)
+	}
+	pkg := map[string]any{
+		"name":    "multi-service-fixture",
+		"version": "1.0.0",
+		"bin":     bin,
+		"files":   files,
+	}
+	raw, err := json.Marshal(pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(root, "package.json"), string(raw), 0o644)
+	writeIgnoredServiceJSON(t, filepath.Join(root, "node_modules", "ignored"))
+	writeIgnoredServiceJSON(t, filepath.Join(root, ".git", "ignored"))
+	writeIgnoredServiceJSON(t, filepath.Join(root, ".hidden", "ignored"))
+	if err := os.MkdirAll(filepath.Join(root, "plain-dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return multiServiceTestPackage{Root: root, Services: services}
+}
+
+func writeMultiServiceRoot(t *testing.T, root string, service multiServiceTestService) {
+	t.Helper()
+	serviceDir := filepath.Join(root, filepath.FromSlash(service.ServiceRoot))
+	methodService, _, ok := strings.Cut(service.MethodFull, "/")
+	if !ok {
+		t.Fatalf("invalid method full name %q", service.MethodFull)
+	}
+	lastDot := strings.LastIndex(methodService, ".")
+	if lastDot < 0 {
+		t.Fatalf("invalid method full name %q", service.MethodFull)
+	}
+	protoPackage := methodService[:lastDot]
+	serviceName := methodService[lastDot+1:]
+	manifest := map[string]any{
+		"schema":       "chaitin.octobus.service.v1",
+		"name":         service.ID,
+		"displayName":  service.ID + " display",
+		"configSchema": "config.schema.json",
+		"secretSchema": "secret.schema.json",
+		"proto": map[string]any{
+			"roots": []string{"proto"},
+			"files": []string{"proto/service.proto"},
+		},
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(serviceDir, "service.json"), string(raw), 0o644)
+	writeTestFile(t, filepath.Join(serviceDir, "config.schema.json"), `{"type":"object"}`, 0o644)
+	writeTestFile(t, filepath.Join(serviceDir, "secret.schema.json"), `{"type":"object"}`, 0o644)
+	writeTestFile(t, filepath.Join(serviceDir, "proto/service.proto"), `syntax = "proto3";
+package `+protoPackage+`;
+service `+serviceName+` { rpc Call(CallRequest) returns (CallResponse); }
+message CallRequest { string text = 1; }
+message CallResponse { string text = 1; }
+`, 0o644)
+}
+
+func writeIgnoredServiceJSON(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(dir, "service.json"), `{"schema":"chaitin.octobus.service.v1","name":"ignored","proto":{"roots":["proto"],"files":["proto/ignored.proto"]}}`, 0o644)
+}
+
 func testManifestName(t *testing.T, manifest string) string {
 	t.Helper()
 	var m struct {

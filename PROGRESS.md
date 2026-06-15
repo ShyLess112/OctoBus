@@ -37,16 +37,16 @@
   - 验收标准：类型可被 admin、CLI 测试引用；单 service import 请求和响应结构保持兼容。
   - 完成总结：已在 `internal/packageimport.Options` 增加 `Recursive bool json:"recursive"`，并新增 `RecursiveResult` 结构承载 services、service count、manifest map、restarted instances 和 restart errors。未接入行为分流，现有单 service import 调用点保持不变。验证命令：`go test ./internal/packageimport ./internal/admin ./internal/cli`，结果通过。
 
-- [ ] 1.2 建立 multi-service importer 测试夹具
+- [x] 1.2 建立 multi-service importer 测试夹具
   - 依赖：1.1。
   - 工作内容：在 `internal/packageimport/importer_test.go` 增加 fixture helper，生成根 `package.json bin`、多个 service root、proto、schema、嵌套目录和 discovery 干扰目录。
   - 可并行子任务：
-    - [ ] 可并行：准备成功导入 fixture，覆盖多个 service root。
-    - [ ] 可并行：准备失败 fixture，覆盖重复 ID、非法 ID、缺 bin、坏 schema、坏 proto、空发现。
-    - [ ] 可并行：准备 scan root fixture，覆盖 `source//some-dir` 子树发现。
+    - [x] 可并行：准备成功导入 fixture，覆盖多个 service root。
+    - [x] 可并行：准备失败 fixture，覆盖重复 ID、非法 ID、缺 bin、坏 schema、坏 proto、空发现。
+    - [x] 可并行：准备 scan root fixture，覆盖 `source//some-dir` 子树发现。
   - 测试方案：`go test ./internal/packageimport`。
   - 验收标准：fixture 能独立构造 deterministic package；不依赖用户 home 目录或真实 registry。
-  - 完成总结：待完成。
+  - 完成总结：已在 `internal/packageimport/importer_test.go` 增加 `writeMultiServiceTestPackage`、`writeMultiServiceRoot` 和 ignored service helper。夹具生成 root `package.json bin`、三个 service roots（含 nested 子树）、proto、config/secret schema、bin entry，以及 `node_modules`、`.git`、隐藏目录和普通目录干扰项；后续测试可通过修改生成结果覆盖重复 ID、非法 ID、缺 bin、坏 schema、坏 proto 和空发现。验证命令：`go test ./internal/packageimport`，结果通过。
 
 - [ ] 1.3 写入目标行为测试骨架
   - 依赖：1.1、1.2。
