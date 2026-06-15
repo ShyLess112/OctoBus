@@ -254,7 +254,10 @@ func TestSplitSourceServiceRoot(t *testing.T) {
 	}{
 		{source: "./tentacle", wantSource: "./tentacle", wantRoot: "."},
 		{source: "./tentacle//Hanqing_Ticket", wantSource: "./tentacle", wantRoot: "Hanqing_Ticket"},
+		{source: "./tentacle//services/ticket/", wantSource: "./tentacle", wantRoot: "services/ticket"},
+		{source: "./tentacle//services//ticket", wantSource: "./tentacle", wantRoot: "services/ticket"},
 		{source: "npm:@scope/tentacle@1.0.0//services/ticket", wantSource: "npm:@scope/tentacle@1.0.0", wantRoot: "services/ticket"},
+		{source: "npm:./tentacle//nested/vendor__gamma", wantSource: "npm:./tentacle", wantRoot: "nested/vendor__gamma"},
 		{source: "./tentacle.tgz//services/../ticket", wantErrText: "must not contain .."},
 		{source: "./tentacle.tgz///abs", wantErrText: "must be relative"},
 		{source: "./tentacle.tgz//", wantErrText: "must not be empty"},

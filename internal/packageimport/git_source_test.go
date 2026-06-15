@@ -60,6 +60,14 @@ func TestParseGitSourceAcceptsSupportedForms(t *testing.T) {
 			redacted: "https://gitlab.com/group/platform/services//packages/tools@release",
 		},
 		{
+			name:     "subdir with slash ref",
+			source:   "https://github.com/acme/services.git//services/nested@feature/subdir",
+			remote:   "https://github.com/acme/services.git",
+			subdir:   "services/nested",
+			ref:      "feature/subdir",
+			redacted: "https://github.com/acme/services.git//services/nested@feature/subdir",
+		},
+		{
 			name:     "omitted ref means latest",
 			source:   "https://gitlab.com/group/platform-services",
 			remote:   "https://gitlab.com/group/platform-services",

@@ -84,15 +84,15 @@
   - 验收标准：discovery 输出与文件系统遍历顺序无关；scan root 不存在、非法或空发现时返回明确错误。
   - 完成总结：已新增 `discoverServiceRoots(packageDir, scanRoot)` helper，默认 scan root 为 `"."`，对非根 scan root 复用 `cleanServiceRoot` 做包内路径校验；扫描时发现 `service.json` 即记录 package root 相对 service root 并停止深入，跳过 `node_modules`、`.git` 和点号开头目录，最终按 service root 稳定排序。新增测试覆盖全包发现、`nested` scan root、package root 自身就是 service root 时不继续深入、scan root 缺失、scan root 是文件、空发现和非法路径。验证命令：`go test ./internal/packageimport`，结果通过。
 
-- [ ] 2.3 保持单 service source 解析兼容
+- [x] 2.3 保持单 service source 解析兼容
   - 依赖：2.1、2.2。
   - 工作内容：确认 `splitSourceServiceRoot`、`cleanServiceRoot`、`sourceWithServiceRoot`、`parseGitSource` 的现有单 service 行为未被 recursive discovery 改动破坏。
   - 可并行子任务：
-    - [ ] 可并行：补齐单 service `//service-dir` 边界测试。
-    - [ ] 可并行：补齐 Git `//subdir@ref` 不回归测试。
+    - [x] 可并行：补齐单 service `//service-dir` 边界测试。
+    - [x] 可并行：补齐 Git `//subdir@ref` 不回归测试。
   - 测试方案：`go test ./internal/packageimport ./internal/cli`。
   - 验收标准：现有 `TestSplitSourceServiceRoot` 和 Git source 测试通过；recursive helper 不改变 HTTPS Git parser 责任边界。
-  - 完成总结：待完成。
+  - 完成总结：已扩展 `TestSplitSourceServiceRoot`，覆盖 trailing slash 清理、重复 slash 清理和 `npm:./tentacle//nested/vendor__gamma` 边界，确认单 service source/root 拆分行为保持兼容；已扩展 `TestParseGitSourceAcceptsSupportedForms`，覆盖 HTTPS Git `//services/nested@feature/subdir`，确认 Git parser 仍负责 subdir 和带 slash ref 的解析，recursive discovery helper 未改变 Git 责任边界。验证命令：`go test ./internal/packageimport ./internal/cli`，结果通过。
 
 ## 3. Importer recursive 核心流程
 
