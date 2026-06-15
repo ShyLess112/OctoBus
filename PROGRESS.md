@@ -48,16 +48,16 @@
   - 验收标准：fixture 能独立构造 deterministic package；不依赖用户 home 目录或真实 registry。
   - 完成总结：已在 `internal/packageimport/importer_test.go` 增加 `writeMultiServiceTestPackage`、`writeMultiServiceRoot` 和 ignored service helper。夹具生成 root `package.json bin`、三个 service roots（含 nested 子树）、proto、config/secret schema、bin entry，以及 `node_modules`、`.git`、隐藏目录和普通目录干扰项；后续测试可通过修改生成结果覆盖重复 ID、非法 ID、缺 bin、坏 schema、坏 proto 和空发现。验证命令：`go test ./internal/packageimport`，结果通过。
 
-- [ ] 1.3 写入目标行为测试骨架
+- [x] 1.3 写入目标行为测试骨架
   - 依赖：1.1、1.2。
   - 工作内容：新增 CLI、admin、importer 的目标行为测试，先表达 `--recursive SOURCE`、`recursive:true`、响应聚合、预校验零提交和请求校验规则。
   - 可并行子任务：
-    - [ ] 可并行：`internal/cli/cli_test.go` 增加 recursive 参数和 source 规范化测试。
-    - [ ] 可并行：`internal/admin/admin_test.go` 增加 recursive 响应和请求校验测试。
-    - [ ] 可并行：`internal/packageimport/importer_test.go` 增加 recursive success/failure 测试。
+    - [x] 可并行：`internal/cli/cli_test.go` 增加 recursive 参数和 source 规范化测试。
+    - [x] 可并行：`internal/admin/admin_test.go` 增加 recursive 响应和请求校验测试。
+    - [x] 可并行：`internal/packageimport/importer_test.go` 增加 recursive success/failure 测试。
   - 测试方案：`go test ./internal/packageimport ./internal/cli ./internal/admin`。
   - 验收标准：新增测试失败原因指向尚未实现的 recursive import，而不是夹具或编译错误。
-  - 完成总结：待完成。
+  - 完成总结：已新增 CLI recursive 请求体测试，验证 `service import --recursive SOURCE` 发送 `recursive:true`、保留 source、默认 build，并且不发送 `service_id`/`name`；新增 recursive 缺 source、多参数、`--name` 互斥校验。Admin 层新增 importer 接口便于目标行为测试，接入 recursive 请求校验、响应聚合骨架和按 service id 初始化的 restart 聚合 map；测试覆盖 `recursive:true` 的非法组合和成功聚合响应。Importer 层新增 `ImportRecursive` 占位方法和失败零提交测试，明确后续实现前返回 `recursive import is not implemented` 且不写入 store；同时修复 multi-service fixture helper 的 service root/proto 目录创建。验证命令：`go test ./internal/packageimport ./internal/cli ./internal/admin`，结果通过；额外验证 `go test ./cmd/octobus ./internal/integration`，结果通过，确认 admin importer 接口改动不破坏外部包构造和 integration 编译。
 
 ## 2. Source 规范化和 recursive discovery
 

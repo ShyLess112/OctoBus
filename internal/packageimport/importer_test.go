@@ -89,6 +89,25 @@ message ListResponse { string text = 1; }
 	}
 }
 
+func TestImporterRecursiveImportSkeletonKeepsStoreEmpty(t *testing.T) {
+	dataDir, s := openTestStore(t)
+	pkg := writeMultiServiceTestPackage(t, t.TempDir())
+	res, err := (&Importer{DataDir: dataDir, Store: s}).ImportRecursive(context.Background(), Options{Source: pkg.Root, Recursive: true, Offline: true})
+	if err == nil || !strings.Contains(err.Error(), "recursive import is not implemented") {
+		t.Fatalf("ImportRecursive error=%v want not implemented", err)
+	}
+	if len(res.Services) != 0 || res.ServiceCount != 0 {
+		t.Fatalf("unexpected recursive result before implementation: %+v", res)
+	}
+	services, err := s.ListServices(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(services) != 0 {
+		t.Fatalf("recursive pre-implementation failure should not commit services: %+v", services)
+	}
+}
+
 func TestImporterKeepsLocalExampleSDKAfterRuntimeDependencyPreparation(t *testing.T) {
 	dataDir, s := openTestStore(t)
 	root := t.TempDir()
@@ -1320,6 +1339,12 @@ func writeMultiServiceTestPackage(t *testing.T, root string) multiServiceTestPac
 func writeMultiServiceRoot(t *testing.T, root string, service multiServiceTestService) {
 	t.Helper()
 	serviceDir := filepath.Join(root, filepath.FromSlash(service.ServiceRoot))
+	if err := os.MkdirAll(serviceDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(serviceDir, "proto"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	methodService, _, ok := strings.Cut(service.MethodFull, "/")
 	if !ok {
 		t.Fatalf("invalid method full name %q", service.MethodFull)

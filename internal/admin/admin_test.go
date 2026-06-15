@@ -24,6 +24,25 @@ import (
 	"octobus/internal/supervisor"
 )
 
+type fakeServiceImporter struct {
+	importFn          func(context.Context, packageimport.Options) (packageimport.Result, error)
+	importRecursiveFn func(context.Context, packageimport.Options) (packageimport.RecursiveResult, error)
+}
+
+func (f fakeServiceImporter) Import(ctx context.Context, opts packageimport.Options) (packageimport.Result, error) {
+	if f.importFn == nil {
+		return packageimport.Result{}, errors.New("unexpected single service import")
+	}
+	return f.importFn(ctx, opts)
+}
+
+func (f fakeServiceImporter) ImportRecursive(ctx context.Context, opts packageimport.Options) (packageimport.RecursiveResult, error) {
+	if f.importRecursiveFn == nil {
+		return packageimport.RecursiveResult{}, errors.New("unexpected recursive service import")
+	}
+	return f.importRecursiveFn(ctx, opts)
+}
+
 func TestStatus(t *testing.T) {
 	ctx := context.Background()
 	dataDir := t.TempDir()
@@ -288,6 +307,84 @@ func TestAdminServiceImportAndRestartLogs(t *testing.T) {
 	for _, forbidden := range []string{"p@ss", "p%40ss", "https://user:"} {
 		if strings.Contains(got, forbidden) {
 			t.Fatalf("service import log leaked %q in:\n%s", forbidden, got)
+		}
+	}
+}
+
+func TestAdminRecursiveServiceImportValidation(t *testing.T) {
+	dataDir := t.TempDir()
+	st, err := store.Open(filepath.Join(dataDir, "octobus.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	srv := &Server{Store: st, Importer: fakeServiceImporter{}, Supervisor: supervisor.New(dataDir, st)}
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "missing source", body: `{"recursive":true}`, want: "service package source is required"},
+		{name: "service id", body: `{"recursive":true,"service_id":"echo","source":"npm:pkg"}`, want: "service_id cannot be used with recursive import"},
+		{name: "name", body: `{"recursive":true,"name":"Echo","source":"npm:pkg"}`, want: "name cannot be used with recursive import"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := serveAdmin(t, srv, http.MethodPost, "/admin/v1/services/import", bytes.NewBufferString(tc.body), http.StatusBadRequest)
+			if !bytes.Contains(body, []byte(tc.want)) {
+				t.Fatalf("body=%s want %q", body, tc.want)
+			}
+		})
+	}
+}
+
+func TestAdminRecursiveServiceImportAggregatesResponse(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	st, err := store.Open(filepath.Join(dataDir, "octobus.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	services := []domain.Service{
+		{ID: "alpha-service", Name: "Alpha", PackageSource: "fixture//alpha", PackageArtifactPath: "pkg-alpha", PackageSHA256: "pkgsha-alpha", DescriptorPath: "desc-alpha", DescriptorSHA256: "descsha-alpha", DescriptorVersion: "descsha-alpha", NodeEntry: "bin/alpha-service.js", RuntimeMode: domain.RuntimeModeLongRunning},
+		{ID: "beta-service", Name: "Beta", PackageSource: "fixture//beta", PackageArtifactPath: "pkg-beta", PackageSHA256: "pkgsha-beta", DescriptorPath: "desc-beta", DescriptorSHA256: "descsha-beta", DescriptorVersion: "descsha-beta", NodeEntry: "bin/beta-service.js", RuntimeMode: domain.RuntimeModeOnDemand},
+	}
+	for _, svc := range services {
+		if err := st.UpsertService(ctx, svc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	source := "npm:@chaitin-ai/octobus-tentacles"
+	srv := &Server{
+		Store:      st,
+		Supervisor: supervisor.New(dataDir, st),
+		Importer: fakeServiceImporter{importRecursiveFn: func(ctx context.Context, opts packageimport.Options) (packageimport.RecursiveResult, error) {
+			if !opts.Recursive || opts.Source != source || opts.ServiceID != "" || opts.Name != "" {
+				t.Fatalf("unexpected recursive options: %+v", opts)
+			}
+			return packageimport.RecursiveResult{Services: services, ServiceCount: len(services)}, nil
+		}},
+	}
+	body := serveAdmin(t, srv, http.MethodPost, "/admin/v1/services/import", bytes.NewBufferString(fmt.Sprintf(`{"recursive":true,"source":%q,"offline":true,"build":"never"}`, source)), http.StatusOK)
+	var got struct {
+		Services           []domain.Service    `json:"services"`
+		ServiceCount       int                 `json:"service_count"`
+		RestartedInstances map[string][]string `json:"restarted_instances"`
+		RestartErrors      map[string][]string `json:"restart_errors"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ServiceCount != 2 || len(got.Services) != 2 {
+		t.Fatalf("unexpected recursive response: %+v", got)
+	}
+	for _, id := range []string{"alpha-service", "beta-service"} {
+		if got.RestartedInstances[id] == nil || len(got.RestartedInstances[id]) != 0 {
+			t.Fatalf("restarted_instances[%s]=%v", id, got.RestartedInstances[id])
+		}
+		if got.RestartErrors[id] == nil || len(got.RestartErrors[id]) != 0 {
+			t.Fatalf("restart_errors[%s]=%v", id, got.RestartErrors[id])
 		}
 	}
 }

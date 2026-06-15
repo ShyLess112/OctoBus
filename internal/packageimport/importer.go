@@ -221,6 +221,22 @@ func (i *Importer) Import(ctx context.Context, opts Options) (Result, error) {
 	return Result{Service: stored, Manifest: manifest}, nil
 }
 
+func (i *Importer) ImportRecursive(ctx context.Context, opts Options) (RecursiveResult, error) {
+	if i.Store == nil {
+		return RecursiveResult{}, errors.New("store is required")
+	}
+	if opts.Source == "" {
+		return RecursiveResult{}, errors.New("service package source is required")
+	}
+	if opts.ServiceID != "" {
+		return RecursiveResult{}, errors.New("service_id cannot be used with recursive import")
+	}
+	if opts.Name != "" {
+		return RecursiveResult{}, errors.New("name cannot be used with recursive import")
+	}
+	return RecursiveResult{}, errors.New("recursive import is not implemented")
+}
+
 func replaceLocalExampleSDK(runtimeDir string) error {
 	raw, err := os.ReadFile(filepath.Join(runtimeDir, "package.json"))
 	if err != nil {
