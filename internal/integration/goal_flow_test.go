@@ -1046,6 +1046,41 @@ func TestCLIRecursiveServiceImportListsServices(t *testing.T) {
 	}
 }
 
+func TestRecursiveServiceImportRestartDegradedIntegration(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	pkgDir := createRecursiveFixturePackage(t, root)
+	st, err := store.Open(filepath.Join(dataDir, "octobus.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	imp := &packageimport.Importer{DataDir: dataDir, Store: st}
+	sup := supervisor.New(dataDir, st)
+	adminSrv := &admin.Server{Store: st, Importer: imp, Supervisor: sup}
+	if _, err := imp.ImportRecursive(ctx, packageimport.Options{Source: pkgDir, Recursive: true, Offline: true, Build: "never"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertInstance(ctx, domain.Instance{ID: "alpha-enabled", ServiceID: "alpha-service", Name: "Alpha Enabled", Enabled: true, Status: domain.StatusStopped, NodeEntry: "bin/alpha-service.js", ConfigJSON: []byte(`{}`)}); err != nil {
+		t.Fatal(err)
+	}
+	resp := postAdminStatus(t, adminSrv, "/admin/v1/services/import", map[string]any{"recursive": true, "source": pkgDir, "offline": true, "build": "never"}, http.StatusConflict)
+	var body struct {
+		Status        string              `json:"status"`
+		RestartErrors map[string][]string `json:"restart_errors"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Status != "degraded" || len(body.RestartErrors["alpha-service"]) == 0 {
+		t.Fatalf("unexpected recursive degraded response: %+v body=%s", body, resp.Body.String())
+	}
+	if _, err := st.GetService(ctx, "alpha-service"); err != nil {
+		t.Fatalf("imported service was rolled back after restart failure: %v", err)
+	}
+}
+
 func createFixturePackage(t *testing.T, root string) string {
 	return createFixturePackageWithProto(t, root, "fixture", `syntax = "proto3";
 package echo.v1;

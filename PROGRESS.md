@@ -223,15 +223,15 @@
   - 验收标准：测试证明 daemon 路径可用；不依赖用户 `~/.octobus`。
   - 完成总结：已在 `internal/integration` 新增 `TestCLIRecursiveServiceImportListsServices`，通过 httptest admin server、真实 CLI 客户端、真实 store 和本地 multi-service fixture 执行 `service import --recursive --offline --build never <pkg>`；随后通过 CLI `service list` 验证 `alpha-service` 与嵌套 `beta-service` 均出现，并断言 `ServiceRoot`、`NodeEntry` 和 store 中持久化 metadata 一致。验证命令：`go test ./internal/integration`，结果通过。
 
-- [ ] 6.2 补充重启聚合端到端覆盖
+- [x] 6.2 补充重启聚合端到端覆盖
   - 依赖：6.1。
   - 工作内容：如 fixture 支持 long-running instance 更新路径，覆盖 recursive import 后 enabled instances 按 service 重启以及 degraded 响应；若 e2e 成本过高，保留 admin/integration 覆盖并在完成总结说明原因。
   - 可并行子任务：
-    - [ ] 可并行：评估现有 supervisor 测试夹具能否复用。
-    - [ ] 可并行：实现重启成功或失败路径断言。
+    - [x] 可并行：评估现有 supervisor 测试夹具能否复用。
+    - [x] 可并行：实现重启成功或失败路径断言。
   - 测试方案：`go test ./internal/admin ./internal/integration`，必要时 `go test ./tests/e2e -count=1`。
   - 验收标准：至少一类跨组件测试证明重启聚合语义；没有覆盖的 e2e 细节有明确理由。
-  - 完成总结：待完成。
+  - 完成总结：已复用 internal integration 的 admin/importer/store/supervisor 组合，新增 `TestRecursiveServiceImportRestartDegradedIntegration`：先 recursive import 本地 multi-service fixture，再创建 enabled long-running instance，随后通过 admin recursive reimport 触发 restart failure，断言 HTTP 409、`status:"degraded"` 和按 `alpha-service` 聚合的 restart error，并确认已导入 service 不因 restart failure 回滚。未增加完整 e2e 进程测试，因为该 integration 已覆盖 admin + importer + store + supervisor 的跨组件语义，完整 e2e 会在最终门禁运行。验证命令：`go test ./internal/integration ./internal/admin`，结果通过。
 
 - [ ] 6.3 更新用户和设计文档
   - 依赖：5.3。
