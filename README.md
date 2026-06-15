@@ -1,5 +1,7 @@
 # OctoBus
 
+[![ci](https://github.com/chaitin/OctoBus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chaitin/OctoBus/actions/workflows/ci.yml)
+
 [中文版 README](README.zh-CN.md)
 
 OctoBus is a locally running single-binary gateway for managing pluggable Node.js service packages and exposing the gRPC capabilities in those packages to clients or agents by capset.

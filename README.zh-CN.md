@@ -1,5 +1,7 @@
 # OctoBus
 
+[![ci](https://github.com/chaitin/OctoBus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chaitin/OctoBus/actions/workflows/ci.yml)
+
 OctoBus 是一个本地运行的单程序网关，用来管理可插拔的 Node.js service package，并把这些 package 中的 gRPC 能力按 capset 暴露给客户端或 agent
 
 当前实现提供一个 Go 编译出的 `octobus` binary，同时承担以下职责：
