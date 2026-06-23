@@ -72,7 +72,7 @@ daemon 默认绑定 localhost，允许通过 `--addr` 显式绑定非 localhost 
 路由原则：
 
 - gRPC 保持原始 method path，通过 `x-octobus-capset` 和
-  `x-octobus-instance` metadata 选择目标；`x-octobus-service` 已废弃并被忽略。
+  `x-octobus-instance` metadata 选择目标。
 - Connect RPC 使用 `/capsets/{capset_id}/connect/{instance_id}/{full_service}/{method}`。
 - MCP 使用 `/capsets/{capset_id}/mcp`，tool name 默认
   `{service}__{instance}__{method}`，冲突时必须显式配置。

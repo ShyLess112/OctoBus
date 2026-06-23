@@ -234,8 +234,6 @@ grpcurl -plaintext \
   gitlab.MergeRequestService/List
 ```
 
-`x-octobus-service` is deprecated and ignored for gRPC routing; callers should route with `x-octobus-capset` and `x-octobus-instance`.
-
 Before forwarding to the backend Node instance, OctoBus strips `x-octobus-*` control metadata, except for `x-octobus-ext-*`, which is passed through. Business extension metadata should use the `x-octobus-ext-*` naming pattern, for example `x-octobus-ext-business-request-id` and `x-octobus-ext-username`, and is forwarded to the service package. The calculator example reads `x-octobus-ext-business-request-id` first and remains compatible with the older `x-business-request-id`. The gRPC gateway for long-running services supports unary, server streaming, client streaming, and bidirectional streaming. On-demand services only support unary invoke.
 
 ### Connect RPC

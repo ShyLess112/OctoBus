@@ -225,9 +225,6 @@ grpcurl -plaintext \
   gitlab.MergeRequestService/List
 ```
 
-`x-octobus-service` is deprecated and ignored for gRPC routing; callers should
-route with `x-octobus-capset` and `x-octobus-instance`.
-
 OctoBus 转发到后端 Node instance 前会剥离 `x-octobus-*` 控制 metadata，但 `x-octobus-ext-*` 是透传例外。业务扩展 metadata 使用 `x-octobus-ext-*` 命名，例如 `x-octobus-ext-business-request-id` 和 `x-octobus-ext-username`，会透传给 service package。calculator 示例优先读取 `x-octobus-ext-business-request-id`，并兼容旧的 `x-business-request-id`。long-running service 的 gRPC 网关支持 unary、server streaming、client streaming 和 bidirectional streaming；on-demand service 只支持 unary invoke。
 
 ### Connect RPC
