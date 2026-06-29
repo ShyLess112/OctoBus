@@ -1,0 +1,41 @@
+{
+  "schema": "chaitin.octobus.service.v1",
+  "name": "fofa-network-space-mapper",
+  "displayName": "FOFA Network Space Mapper",
+  "description": "OctoBus package for FOFA network space mapping engine - search for internet assets, devices, and services. Supports asset discovery, attack surface enumeration, vulnerability assessment, and statistical aggregation.",
+  "runtime": {
+    "mode": "on-demand"
+  },
+  "proto": {
+    "roots": [
+      "proto"
+    ],
+    "files": [
+      "proto/fofa.proto"
+    ]
+  },
+  "configSchema": "config.schema.json",
+  "secretSchema": "secret.schema.json",
+  "sdk": {
+    "cli": {
+      "commands": {
+        "FOFA.FOFA/Search": {
+          "name": "search",
+          "description": "Search FOFA network space for assets matching query syntax."
+        },
+        "FOFA.FOFA/GetHost": {
+          "name": "get-host",
+          "description": "Get detailed host information from FOFA including ports, services, banners, and certificates."
+        },
+        "FOFA.FOFA/GetAccountInfo": {
+          "name": "get-account-info",
+          "description": "Get FOFA account information including user stats, VIP level, and API usage quota."
+        },
+        "FOFA.FOFA/GetStats": {
+          "name": "get-stats",
+          "description": "Get statistical aggregation of FOFA search results - count by protocol, port, country, etc."
+        }
+      }
+    }
+  }
+}
