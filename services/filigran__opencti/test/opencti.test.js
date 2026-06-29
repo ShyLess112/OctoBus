@@ -489,3 +489,93 @@ test('Missing credentials fails gracefully', async () => {
   const { rpcdef } = await import('../src/opencti.js');
   await assert.rejects(() => rpcdef(buildCtx({}, { bindings: { endpoint: 'http://x', api_token: '' } }))[searchIndicatorsPath](), /FAILED_PRECONDITION/);
 });
+
+// ── Review fix verification ──────────────────────────────────
+
+test('gqlEscape escapes backslashes before quotes to prevent injection', async () => {
+  const { _test } = await import('../src/opencti.js');
+  // Backslash must be escaped first to avoid creating invalid escape sequences
+  assert.equal(_test.gqlEscape('abc\\def'), 'abc\\\\def');
+  assert.equal(_test.gqlEscape('path"C:\\Users"'), 'path"C:\\\\Users"');
+  assert.equal(_test.gqlEscape('simple"quote'), 'simple\\"quote');
+  assert.equal(_test.gqlEscape('both\\"chars'), 'both\\\\\\"chars');
+});
+
+test('mapIndicator maps x_opencti_score to proto field "score" (not "x_opencti_score")', async () => {
+  const { _test } = await import('../src/opencti.js');
+  const node = {
+    id: '1', standard_id: 'indicator--test', name: 'test-IOC',
+    pattern_type: 'stix', pattern: 'p', valid_from: '', valid_until: '',
+    indicator_types: [], description: '', x_opencti_score: '75',
+  };
+  const mapped = _test.mapIndicator(node);
+  assert.equal(mapped.score, '75');                    // proto field "score"
+  assert.equal(mapped.x_opencti_score, undefined);    // NOT mapped as x_opencti_score
+});
+
+test('CreateObservable for File type auto-detects hash algorithm by hex length', async () => {
+  let capturedBody;
+
+  // MD5 = 32 hex chars
+  setFetch(async (url, init) => {
+    capturedBody = JSON.parse(init.body);
+    return {
+      ok: true, status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      text: async () => JSON.stringify({ data: {
+        stixCyberObservableAdd: { id: 'f1', entity_type: 'File', observable_value: 'd41d8cd98f00b204e9800998ecf8427e' },
+      }}),
+    };
+  });
+  const { rpcdef } = await import('../src/opencti.js');
+  await rpcdef(buildCtx({ type: 'File', value: 'd41d8cd98f00b204e9800998ecf8427e' }))[createObservablePath]();
+  assert.ok(capturedBody.query.includes('MD5'), '32 hex chars should map to MD5');
+  assert.ok(!capturedBody.query.includes('SHA256'), 'MD5 should NOT also set SHA256');
+
+  // SHA1 = 40 hex chars
+  setFetch(async (url, init) => {
+    capturedBody = JSON.parse(init.body);
+    return {
+      ok: true, status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      text: async () => JSON.stringify({ data: {
+        stixCyberObservableAdd: { id: 'f2', entity_type: 'File', observable_value: 'da39a3ee5e6b4b0d3255bfef95601890afd80709' },
+      }}),
+    };
+  });
+  const { rpcdef: rpcdef2 } = await import('../src/opencti.js');
+  await rpcdef2(buildCtx({ type: 'File', value: 'da39a3ee5e6b4b0d3255bfef95601890afd80709' }))[createObservablePath]();
+  assert.ok(capturedBody.query.includes('SHA1'), '40 hex chars should map to SHA1');
+
+  // SHA256 = 64 hex chars
+  setFetch(async (url, init) => {
+    capturedBody = JSON.parse(init.body);
+    return {
+      ok: true, status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      text: async () => JSON.stringify({ data: {
+        stixCyberObservableAdd: { id: 'f3', entity_type: 'File', observable_value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+      }}),
+    };
+  });
+  const { rpcdef: rpcdef3 } = await import('../src/opencti.js');
+  await rpcdef3(buildCtx({ type: 'File', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' }))[createObservablePath]();
+  assert.ok(capturedBody.query.includes('SHA256'), '64 hex chars should map to SHA256');
+  assert.ok(!capturedBody.query.includes('MD5'), 'SHA256 should NOT also set MD5');
+
+  // Non-hash value (filename) — uses simple value field, not hashes
+  setFetch(async (url, init) => {
+    capturedBody = JSON.parse(init.body);
+    return {
+      ok: true, status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      text: async () => JSON.stringify({ data: {
+        stixCyberObservableAdd: { id: 'f4', entity_type: 'File', observable_value: 'malware.exe' },
+      }}),
+    };
+  });
+  const { rpcdef: rpcdef4 } = await import('../src/opencti.js');
+  await rpcdef4(buildCtx({ type: 'File', value: 'malware.exe' }))[createObservablePath]();
+  assert.ok(capturedBody.query.includes('value: "malware.exe"'), 'non-hash should use value field');
+  assert.ok(!capturedBody.query.includes('hashes'), 'non-hash should NOT include hashes');
+});
