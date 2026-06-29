@@ -3,7 +3,9 @@
 [![OctoBus Service](https://img.shields.io/badge/OctoBus-Service-blue)](https://github.com/chaitin-ai/octobus)
 [![FOFA API](https://img.shields.io/badge/FOFA-API%20v1-green)](https://fofa.info)
 
-OctoBus 服务封装 FOFA 网络空间测绘引擎 API，提供资产搜索、主机详情、账号信息和统计聚合能力。
+OctoBus 服务封装 FOFA 网络空间测绘引擎 API v1，提供资产搜索、账号信息和统计聚合能力。
+
+**官方 API 只有一个查询接口 `/search/all`**，本服务通过灵活的 fields 参数支持主机搜索、详细信息获取等多种场景。
 
 ## 快速开始
 
@@ -46,88 +48,93 @@ curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA
 
 | 方法 | 描述 | 用途 |
 |------|------|------|
-| `FOFA.FOFA/Search` | 资产搜索 | 资产发现、攻击面枚举、漏洞评估 |
-| `FOFA.FOFA/GetHost` | 主机详情 | IP 调查、端口发现、服务识别 |
+| `FOFA.FOFA/Search` | 资产搜索 | 资产发现、主机调查、攻击面枚举、漏洞评估 |
 | `FOFA.FOFA/GetAccountInfo` | 账号信息 | 配额监控、VIP 验证 |
 | `FOFA.FOFA/GetStats` | 统计聚合 | 攻击面分析、资产分布统计 |
 
 ### Search（资产搜索）
 
-搜索 FOFA 网络空间中匹配查询语法的资产。
+搜索 FOFA 网络空间中匹配查询语法的资产。**通过 fields 参数可获取详细信息**，实现主机调查功能。
 
 **请求参数**
 
 | 参数 | 类型 | 必填 | 默认值 | 描述 |
 |------|------|:----:|:------:|------|
-| `query` | string | ✓ | - | FOFA 查询语法，如 `app="Nginx"`、`domain="example.com"` |
+| `query` | string | ✓ | - | FOFA 查询语法，如 `app="Nginx"`、`ip="1.1.1.1"`、`domain="example.com"` |
 | `page` | int32 | | 1 | 页码 |
 | `size` | int32 | | 100 | 每页条数（最大 10000） |
-| `fields` | string | | `host,ip,port,protocol` | 返回字段（逗号分隔） |
-| `full` | bool | | false | 返回完整 banner 信息 |
+| `fields` | string | | `host,ip,port,protocol` | 返回字段（逗号分隔），详见下方字段列表 |
+| `full` | bool | | false | 搜索全部历史数据（默认搜索1年内） |
+
+**支持的 fields 字段（附录1）**
+
+| 序号 | 字段名 | 描述 | 权限 |
+|:----:|--------|------|------|
+| 1 | `ip` | IP 地址 | 无 |
+| 2 | `port` | 端口 | 无 |
+| 3 | `protocol` | 协议名 | 无 |
+| 4 | `country` | 国家代码 | 无 |
+| 5 | `country_name` | 国家名 | 无 |
+| 6 | `region` | 区域 | 无 |
+| 7 | `city` | 城市 | 无 |
+| 8 | `longitude` | 地理位置 经度 | 无 |
+| 9 | `latitude` | 地理位置 纬度 | 无 |
+| 10 | `asn` | ASN 编号 | 无 |
+| 11 | `org` | ASN 组织 | 无 |
+| 12 | `host` | 主机名 | 无 |
+| 13 | `domain` | 域名 | 无 |
+| 14 | `os` | 操作系统 | 无 |
+| 15 | `server` | 网站 server | 无 |
+| 16 | `icp` | ICP 备案号 | 无 |
+| 17 | `title` | 网站标题 | 无 |
+| 18 | `jarm` | JARM 指纹 | 无 |
+| 19 | `header` | 网站 header | 无 |
+| 20 | `banner` | 协议 banner | 无 |
+| 21 | `cert` | 证书 | 无 |
+| 22 | `base_protocol` | 基础协议（tcp/udp） | 无 |
+| 23 | `link` | 资产 URL 链接 | 无 |
+| 24-33 | `cert.*`, `tls.*` | 证书/TLS 相关字段 | 无 |
+| 34 | `status_code` | HTTP 状态码 | 无 |
 
 **调用示例**
 
 ```bash
+# 基础搜索
 curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA.FOFA/Search \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer mysecret123" \
   -d '{"query":"domain=\"baidu.com\"","size":5}'
+
+# 获取详细信息（主机调查）
+curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA.FOFA/Search \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer mysecret123" \
+  -d '{"query":"ip=\"101.200.136.115\"","fields":"host,ip,port,protocol,os,server,title,country,cert","size":100}'
+
+# 搜索特定 IP 的所有资产
+curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA.FOFA/Search \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer mysecret123" \
+  -d '{"query":"ip=\"1.1.1.1\"","fields":"host,ip,port,protocol,banner","full":true}'
 ```
 
 **响应示例**
 
 ```json
 {
+  "error": false,
+  "errmsg": "",
+  "size": 73901,
+  "page": 1,
   "results": [
     {
       "host": "https://mobile.baidu.com",
       "ip": "14.215.183.117",
       "port": "443",
-      "protocol": "https"
-    },
-    {
-      "host": "https://ditu.baidu.com",
-      "ip": "180.76.11.169",
-      "port": "443",
-      "protocol": "https"
+      "protocol": "https",
+      "raw": { "..." }
     }
   ]
-}
-```
-
-### GetHost（主机详情）
-
-获取指定主机的详细信息，包括端口、服务、banner 和证书。
-
-**请求参数**
-
-| 参数 | 类型 | 必填 | 默认值 | 描述 |
-|------|------|:----:|:------:|------|
-| `host` | string | ✓ | - | IP 地址或主机名 |
-| `detail` | bool | | false | 返回详细 banner 信息 |
-
-**调用示例**
-
-```bash
-curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA.FOFA/GetHost \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer mysecret123" \
-  -d '{"host":"baidu.com","detail":true}'
-```
-
-**响应示例**
-
-```json
-{
-  "raw": {
-    "host": "baidu.com",
-    "ip": "111.63.65.247",
-    "country_code": "CN",
-    "ports": [
-      {"port": 80, "protocol": "http"},
-      {"port": 443, "protocol": "https"}
-    ]
-  }
 }
 ```
 
@@ -170,9 +177,9 @@ curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA
 | 参数 | 类型 | 必填 | 描述 |
 |------|------|:----:|------|
 | `query` | string | ✓ | FOFA 查询语法 |
-| `field` | string | ✓ | 聚合字段 |
+| `fields` | string | ✓ | 聚合字段（逗号分隔） |
 
-**支持的聚合字段**：`protocol`、`port`、`country`、`region`、`city`、`os`、`app`、`server`
+**支持的聚合字段**：`protocol`、`port`、`country`、`domain`、`title`、`os`、`server`、`asn`、`org`、`region`、`city`、`asset_type`、`fid`、`icp`
 
 **调用示例**
 
@@ -180,7 +187,7 @@ curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA
 curl -X POST http://127.0.0.1:9000/capsets/security-agent/connect/fofa-test/FOFA.FOFA/GetStats \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer mysecret123" \
-  -d '{"query":"domain=\"baidu.com\"","field":"port"}'
+  -d '{"query":"domain=\"baidu.com\"","fields":"protocol,port,country"}'
 ```
 
 ---
@@ -263,7 +270,7 @@ app="Nginx" && country="CN"
 ## 安全注意事项
 
 1. **凭证保护**：API 密钥存储在 secret 配置中，切勿提交到版本控制
-2. **速率限制**：FOFA API 有调用频率限制，超出会返回 `429` 错误
+2. **速率限制**：GetStats 接口限制并发 5秒/次；其他接口有调用频率限制
 3. **配额监控**：定期使用 `GetAccountInfo` 检查 API 配额使用情况
 4. **网络要求**：服务需要能访问 FOFA API 端点
 

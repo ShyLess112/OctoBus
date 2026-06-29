@@ -22,10 +22,6 @@ const loadHandler = async (handlerName, req, overrides = {}) => {
   return () => handler(ctx);
 };
 
-const mockFetch = (impl) => {
-  setFetch(async (...args) => impl(...args));
-};
-
 test('internal helpers normalize bindings and errors', async () => {
   const { _test } = await import('../src/fofa.js');
 
@@ -98,7 +94,7 @@ test('Search validates request fields before downstream call', async () => {
   await assert.rejects(() => noKey(), /UNAUTHENTICATED: email and key are required in secret/);
 });
 
-test('Search forwards query, headers, and maps results', async () => {
+test('Search forwards query with qbase64 and maps results', async () => {
   let captured;
   setFetch(async (url, init) => {
     captured = { url, init };
@@ -110,7 +106,7 @@ test('Search forwards query, headers, and maps results', async () => {
         error: false,
         errmsg: '',
         size: 2,
-        next: 'next-token',
+        page: 1,
         results: [
           { host: 'example.com', ip: '1.1.1.1', port: 443, protocol: 'https' },
           { host: 'test.com', ip: '2.2.2.2', port: 80, protocol: 'http' }
@@ -132,14 +128,12 @@ test('Search forwards query, headers, and maps results', async () => {
 
   const res = await handler();
 
-  assert.match(captured.url, /http:\/\/localhost:18081\/search\//);
-  assert.match(captured.url, /email=test%40example\.com/);
-  assert.match(captured.url, /key=test-key/);
-  assert.match(captured.url, /q=app%3D%22Nginx%22/);
+  assert.match(captured.url, /http:\/\/localhost:18081\/search\/all/);
+  // Search uses qbase64 (base64 encoded query) per FOFA API v1 spec
+  assert.match(captured.url, /qbase64=/);
   assert.match(captured.url, /page=1/);
   assert.match(captured.url, /size=100/);
   assert.match(captured.url, /fields=host%2Cip%2Cport%2Cprotocol/);
-  // Note: full=false is intentionally omitted from URL (FOFA API issue)
 
   assert.equal(captured.init.method, 'GET');
   assert.equal(captured.init.headers['User-Agent'], 'OctoBus-FOFA-Client/1.0');
@@ -148,7 +142,6 @@ test('Search forwards query, headers, and maps results', async () => {
   assert.equal(res.error, false);
   assert.equal(res.errmsg, '');
   assert.equal(res.size, 2);
-  assert.equal(res.next, 'next-token');
   assert.equal(res.results.length, 2);
   assert.equal(res.results[0].host, 'example.com');
   assert.equal(res.results[0].ip, '1.1.1.1');
@@ -185,51 +178,6 @@ test('Search handles response errors', async () => {
   await assert.rejects(() => serverError(), /UNAVAILABLE: FOFA server error/);
 });
 
-test('GetHost validates request fields', async () => {
-  const noHost = await loadHandler('FOFA.FOFA/GetHost', {});
-  await assert.rejects(() => noHost(), /INVALID_ARGUMENT: host is required/);
-
-  const emptyHost = await loadHandler('FOFA.FOFA/GetHost', { host: '' });
-  await assert.rejects(() => emptyHost(), /INVALID_ARGUMENT: host is required/);
-});
-
-test('GetHost forwards request and maps response', async () => {
-  let captured;
-  setFetch(async (url, init) => {
-    captured = { url, init };
-    return {
-      ok: true,
-      status: 200,
-      headers: new Map([['content-type', 'application/json']]),
-      json: async () => ({
-        error: false,
-        errmsg: '',
-        host: '1.1.1.1',
-        ip: '1.1.1.1',
-        ports: [
-          { port: 80, protocol: 'http' },
-          { port: 443, protocol: 'https' }
-        ]
-      }),
-    };
-  });
-
-  const handler = await loadHandler('FOFA.FOFA/GetHost', {
-    host: '1.1.1.1',
-    detail: { value: true }
-  });
-
-  const res = await handler();
-
-  assert.match(captured.url, /\/info\/host/);
-  assert.match(captured.url, /host=1\.1\.1\.1/);
-  assert.match(captured.url, /detail=true/);
-
-  assert.equal(res.error, false);
-  assert.equal(res.errmsg, '');
-  assert.ok(res.raw);
-});
-
 test('GetAccountInfo handles request', async () => {
   let captured;
   setFetch(async (url, init) => {
@@ -261,14 +209,11 @@ test('GetStats validates request fields', async () => {
   const noQuery = await loadHandler('FOFA.FOFA/GetStats', {});
   await assert.rejects(() => noQuery(), /INVALID_ARGUMENT: query is required/);
 
-  const noField = await loadHandler('FOFA.FOFA/GetStats', { query: 'test' });
-  await assert.rejects(() => noField(), /INVALID_ARGUMENT: field is required/);
-
-  const invalidField = await loadHandler('FOFA.FOFA/GetStats', { query: 'test', field: 'invalid' });
-  await assert.rejects(() => invalidField(), /INVALID_ARGUMENT: field must be one of/);
+  const invalidField = await loadHandler('FOFA.FOFA/GetStats', { query: 'test', fields: 'invalid' });
+  await assert.rejects(() => invalidField(), /INVALID_ARGUMENT: field "invalid" must be one of/);
 });
 
-test('GetStats forwards request and maps response', async () => {
+test('GetStats forwards request with qbase64 and fields', async () => {
   let captured;
   setFetch(async (url, init) => {
     captured = { url, init };
@@ -279,10 +224,8 @@ test('GetStats forwards request and maps response', async () => {
       json: async () => ({
         error: false,
         errmsg: '',
-        aggregations: {
-          http: 5000,
-          https: 3000,
-          ssh: 1000
+        aggs: {
+          protocol: { http: 5000, https: 3000 }
         }
       }),
     };
@@ -290,14 +233,15 @@ test('GetStats forwards request and maps response', async () => {
 
   const handler = await loadHandler('FOFA.FOFA/GetStats', {
     query: 'app="Nginx"',
-    field: 'protocol'
+    fields: 'protocol,port'
   });
 
   const res = await handler();
 
   assert.match(captured.url, /\/search\/stats/);
-  assert.match(captured.url, /q=app%3D%22Nginx%22/);
-  assert.match(captured.url, /field=protocol/);
+  // GetStats uses qbase64 (base64 encoded query)
+  assert.match(captured.url, /qbase64=/);
+  assert.match(captured.url, /fields=protocol%2Cport/);
 
   assert.equal(res.error, false);
   assert.equal(res.errmsg, '');

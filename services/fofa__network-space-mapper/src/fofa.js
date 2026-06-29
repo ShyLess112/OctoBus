@@ -1,4 +1,5 @@
 // FOFA Network Space Mapper service implementation
+// Official FOFA API v1 - only /search/all endpoint for queries
 // Bindings: baseUrl (required), headers (optional), timeoutMs (optional)
 
 import { GrpcError, grpcStatus } from '@chaitin-ai/octobus-sdk';
@@ -132,7 +133,6 @@ const makeRequest = async (ctx, endpoint, params) => {
 
   const timeoutMs = Number(bindings.timeoutMs) || DEFAULT_TIMEOUT_MS;
   const url = `${baseUrl}${endpoint}?${buildSearchParams({ ...params, email, key })}`;
-  console.error('[DEBUG makeRequest] URL:', url);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -142,7 +142,7 @@ const makeRequest = async (ctx, endpoint, params) => {
       method: 'GET',
       headers,
       signal: controller.signal,
-      cache: 'no-store', // 禁用缓存
+      cache: 'no-store',
     });
 
     clearTimeout(timeoutId);
@@ -174,13 +174,12 @@ const makeRequest = async (ctx, endpoint, params) => {
   }
 };
 
-// Search handler - SDK passes ctx object with request inside
+// Search handler - FOFA API v1 /search/all
+// Use for: asset discovery, host investigation, attack surface enumeration, vulnerability assessment
+// Example queries: domain="example.com", ip="1.1.1.1", app="Nginx", title="login"
 export const Search = async (ctx) => {
   const req = ctx.request;
-  console.error('[DEBUG Search] ctx:', JSON.stringify(ctx, (k, v) => typeof v === 'function' ? '[Function]' : v, 2));
-  console.error('[DEBUG Search] req:', JSON.stringify(req, null, 2));
   const query = unwrapString(req.query);
-  console.error('[DEBUG Search] query:', query);
   if (!query || query.trim() === '') {
     throw errorWithCode('INVALID_ARGUMENT', 'query is required');
   }
@@ -194,14 +193,17 @@ export const Search = async (ctx) => {
     throw errorWithCode('INVALID_ARGUMENT', `size must be between 1 and ${MAX_SIZE}`);
   }
 
+  // FOFA API requires base64 encoded query string as qbase64
+  const qbase64 = Buffer.from(query, 'utf-8').toString('base64');
+
   const params = {
-    q: query,
+    qbase64,
     page: String(page),
     size: String(size),
     fields,
   };
 
-  // Only pass full=true; omitting full=false because FOFA API incorrectly rewrites the query when full=false is passed
+  // full=true searches all historical data (default: 1 year)
   if (full) {
     params.full = 'true';
   }
@@ -212,7 +214,7 @@ export const Search = async (ctx) => {
   if (data.results && Array.isArray(data.results)) {
     for (const item of data.results) {
       if (Array.isArray(item)) {
-        // FOFA API returns arrays when fields are not specified: [host, ip, port, protocol, ...]
+        // FOFA returns arrays when default fields: [host, ip, port, protocol, ...]
         results.push({
           host: item[0] || '',
           ip: item[1] || '',
@@ -221,7 +223,7 @@ export const Search = async (ctx) => {
           raw: toValue(item),
         });
       } else {
-        // FOFA API returns objects when fields are specified
+        // FOFA returns objects when custom fields specified
         results.push({
           host: item.host || '',
           ip: item.ip || '',
@@ -236,76 +238,13 @@ export const Search = async (ctx) => {
   return {
     error: Boolean(data.error),
     errmsg: data.errmsg || '',
-    size: data.size,
-    next: data.next || '',
+    size: data.size || 0,
+    page: data.page || page,
     results,
   };
 };
 
-// GetHost handler - implemented via Search API since FOFA v1 has no /info/host endpoint
-export const GetHost = async (ctx) => {
-  const req = ctx.request;
-  const host = unwrapString(req.host);
-  if (!host || host.trim() === '') {
-    throw errorWithCode('INVALID_ARGUMENT', 'host is required');
-  }
-
-  const detail = unwrapBoolean(req.detail);
-
-  // Use Search API with ip or domain query
-  const query = host.match(/^\d+\.\d+\.\d+\.\d+$/)
-    ? `ip="${host}"`
-    : `domain="${host}"`;
-
-  const params = {
-    q: query,
-    page: String(1),
-    size: String(100),
-  };
-
-  const data = await makeRequest(ctx, '/search/all', params);
-
-  // Aggregate results
-  const ports = [];
-  const portSet = new Set();
-  const hostSet = new Set();
-  let primaryIp = '';
-
-  if (data.results && Array.isArray(data.results)) {
-    for (const item of data.results) {
-      if (Array.isArray(item)) {
-        // item: [host, ip, port, protocol, ...]
-        const ip = item[1] || '';
-        const port = item[2] || '';
-        const protocol = item[3] || '';
-
-        if (ip && !primaryIp) primaryIp = ip;
-        if (host && port) {
-          const key = `${port}:${protocol}`;
-          if (!portSet.has(key)) {
-            portSet.add(key);
-            ports.push({ port: parseInt(port) || 0, protocol });
-          }
-        }
-        if (item[0]) hostSet.add(item[0]);
-      }
-    }
-  }
-
-  return {
-    error: Boolean(data.error),
-    errmsg: data.errmsg || '',
-    raw: toValue({
-      host,
-      ip: primaryIp,
-      ports,
-      host_count: hostSet.size,
-      results_count: data.results?.length || 0,
-    }),
-  };
-};
-
-// GetAccountInfo handler
+// GetAccountInfo handler - FOFA API v1 /info/my
 export const GetAccountInfo = async (ctx) => {
   const data = await makeRequest(ctx, '/info/my', {});
 
@@ -316,7 +255,7 @@ export const GetAccountInfo = async (ctx) => {
   };
 };
 
-// GetStats handler
+// GetStats handler - FOFA API v1 /search/stats
 export const GetStats = async (ctx) => {
   const req = ctx.request;
   const query = unwrapString(req.query);
@@ -324,9 +263,9 @@ export const GetStats = async (ctx) => {
     throw errorWithCode('INVALID_ARGUMENT', 'query is required');
   }
 
-  const fields = unwrapString(req.fields) || 'protocol,port,country,domain';
+  const fields = unwrapString(req.fields) || 'protocol,port,country';
 
-  const validFields = ['protocol', 'domain', 'port', 'title', 'os', 'server', 'country', 'asn', 'org', 'asset_type', 'fid', 'icp'];
+  const validFields = ['protocol', 'domain', 'port', 'title', 'os', 'server', 'country', 'region', 'city', 'asn', 'org', 'asset_type', 'fid', 'icp'];
   const requestedFields = fields.split(',').map(f => f.trim()).filter(f => f);
 
   for (const f of requestedFields) {
@@ -353,13 +292,11 @@ export const GetStats = async (ctx) => {
 };
 
 export const METHOD_SEARCH_FULL = 'FOFA.FOFA/Search';
-export const METHOD_GET_HOST_FULL = 'FOFA.FOFA/GetHost';
 export const METHOD_GET_ACCOUNT_INFO_FULL = 'FOFA.FOFA/GetAccountInfo';
 export const METHOD_GET_STATS_FULL = 'FOFA.FOFA/GetStats';
 
 export const handlers = {
   [METHOD_SEARCH_FULL]: Search,
-  [METHOD_GET_HOST_FULL]: GetHost,
   [METHOD_GET_ACCOUNT_INFO_FULL]: GetAccountInfo,
   [METHOD_GET_STATS_FULL]: GetStats,
 };

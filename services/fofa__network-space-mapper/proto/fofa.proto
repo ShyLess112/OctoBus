@@ -9,12 +9,9 @@ option go_package = "miner/grpc-service/FOFA";
 
 service FOFA {
   // Search FOFA network space for assets matching query syntax
-  // Use for asset discovery, attack surface enumeration, and vulnerability assessment
+  // Supports flexible field selection for host discovery, IP investigation, and detailed asset analysis
+  // Use for asset discovery, attack surface enumeration, vulnerability assessment, and host investigation
   rpc Search(SearchRequest) returns (SearchResponse) {}
-
-  // Get detailed host information from FOFA including ports, services, banners, and certificates
-  // Use when investigating a specific IP address for open ports and running services
-  rpc GetHost(GetHostRequest) returns (GetHostResponse) {}
 
   // Get FOFA account information including user stats, VIP level, and API usage quota
   // Use to check account status and available API credits
@@ -25,23 +22,23 @@ service FOFA {
   rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
 }
 
-// Search request parameters
+// Search request parameters - FOFA API v1 /search/all
 message SearchRequest {
   string email = 1; // FOFA account email (from secret)
   string key = 2; // FOFA API key (from secret)
   string query = 3; // FOFA search query syntax (e.g. app="Nginx", ip="1.1.1.1", domain="example.com")
   google.protobuf.Int32Value page = 4; // Page number (default 1)
   google.protobuf.Int32Value size = 5; // Results per page (default 100, max 10000)
-  string fields = 6; // Comma-separated fields to return (default: host,ip,port,protocol)
-  google.protobuf.BoolValue full = 7; // Return full banner information
+  string fields = 6; // Comma-separated fields to return. Supports: ip,port,protocol,country,country_name,region,city,longitude,latitude,asn,org,host,domain,os,server,icp,title,jarm,header,banner,cert,base_protocol,link,cert.issuer.org,cert.issuer.cn,cert.subject.org,cert.subject.cn,tls.ja3s,tls.version,cert.sn,cert.not_before,cert.not_after,cert.domain,status_code,header_hash,banner_hash,banner_fid,cname,lastupdatetime,product,product_category,product.version,icon_hash,cert.is_valid,cname_domain,body,cert.is_match,cert.is_equal,icon,fid,structinfo
+  google.protobuf.BoolValue full = 7; // Search full historical data (default: 1 year)
 }
 
 // Search response
 message SearchResponse {
   bool error = 1; // Error flag
   string errmsg = 2; // Error message
-  // removed: Int64Value size = 3; // Total number of results
-  // removed: string next = 4; // Next page token
+  int64 size = 3; // Total number of results
+  int64 page = 4; // Current page number
   repeated SearchResult results = 5; // Search results
 }
 
@@ -50,23 +47,8 @@ message SearchResult {
   string host = 1; // Host address
   string ip = 2; // IP address
   string port = 3; // Port number
-  string protocol = 4; // Protocol (http/https)
-  google.protobuf.Struct raw = 5; // Raw response data from FOFA
-}
-
-// Get host request parameters
-message GetHostRequest {
-  string email = 1; // FOFA account email (from secret)
-  string key = 2; // FOFA API key (from secret)
-  string host = 3; // IP address or hostname to query
-  google.protobuf.BoolValue detail = 4; // Return detailed banner information
-}
-
-// Get host response
-message GetHostResponse {
-  bool error = 1; // Error flag
-  string errmsg = 2; // Error message
-  google.protobuf.Struct raw = 3; // Raw response data from FOFA
+  string protocol = 4; // Protocol (http/https/etc)
+  google.protobuf.Struct raw = 5; // Raw response data from FOFA (contains all requested fields)
 }
 
 // Get account info request (no parameters required)
