@@ -71,7 +71,7 @@
 
 参考文档：[实施计划 阶段 2](docs/plan/services-sdk-0-6-upgrade-implementation-plan.md#阶段-2统一-sdk-dependency-版本)
 
-- [ ] 2.1 批量更新 services package SDK 版本
+- [x] 2.1 批量更新 services package SDK 版本
   - 依赖：任务 1.1。
   - 工作内容：
     - 将 `services/package.json` 的 `dependencies["@chaitin-ai/octobus-sdk"]` 从 `^0.5.0` 改为 `^0.6.0`。
@@ -79,8 +79,8 @@
     - 保留每个 package 文件的既有依赖顺序、缩进和其他依赖版本。
     - 保留已存在的 `undici` 直接依赖和根 `bundledDependencies`。
   - 可并行子任务：
-    - [ ] 可并行：root `services/package.json` 更新。
-    - [ ] 可并行：50 个 service root `package.json` 更新，可按目录分片。
+    - [x] 可并行：root `services/package.json` 更新。
+    - [x] 可并行：50 个 service root `package.json` 更新，可按目录分片。
   - 测试方案：
     - `rg '"@chaitin-ai/octobus-sdk": "\\^0\\.5\\.0"' services/package.json services/*/package.json`
     - `node -e 'const fs=require("fs"),path=require("path"); const files=["services/package.json",...fs.readdirSync("services").map(d=>path.join("services",d,"package.json")).filter(fs.existsSync)]; for (const f of files){const p=JSON.parse(fs.readFileSync(f,"utf8")); if(p.dependencies?.["@chaitin-ai/octobus-sdk"]!=="^0.6.0") throw new Error(f);}'`
@@ -89,10 +89,24 @@
     - 未修改 proto、schema、service name、bin、handler key 或业务源码。
     - 没有新增 tracked lockfile 或 node_modules。
   - 完成总结：
-    - 状态：待完成。
-    - 变更：待完成。
-    - 验证：待完成。
-    - 审计与例外：待完成。
+    - 状态：已完成。完成纯 dependency 声明升级，未修改业务源码或 runtime 契约文件。
+    - 变更：
+      - `services/package.json` 中 `dependencies["@chaitin-ai/octobus-sdk"]` 从 `^0.5.0` 更新为 `^0.6.0`。
+      - 50 个 `services/*/package.json` 中直接 SDK dependency 从 `^0.5.0` 更新为 `^0.6.0`。
+      - 保留根 `bundledDependencies` 为 `@alicloud/swas-open20200601`、`@chaitin-ai/octobus-sdk`、`commander`、`undici`。
+      - 未修改 proto、schema、service name、bin、handler key、dispatcher mapping、runtime mode 或业务源码。
+    - 验证：
+      - `rg -l '"@chaitin-ai/octobus-sdk": "\\^0\\.5\\.0"' services/package.json services/*/package.json | wc -l`：任务开始前确认命中 51 个 package 文件。
+      - `rg '"@chaitin-ai/octobus-sdk": "\\^0\\.5\\.0"' services/package.json services/*/package.json || true`：升级后无输出。
+      - `node -e 'const fs=require("fs"),path=require("path"); const files=["services/package.json",...fs.readdirSync("services").map(d=>path.join("services",d,"package.json")).filter(fs.existsSync)]; let count=0; for (const f of files){const p=JSON.parse(fs.readFileSync(f,"utf8")); if(p.dependencies?.["@chaitin-ai/octobus-sdk"]!=="^0.6.0") throw new Error(f); count++;} console.log(`checked ${count} package files`);'`：输出 `checked 51 package files`。
+      - 根 `services/package.json` 审计脚本：确认 SDK dependency 为 `^0.6.0`，`bundledDependencies` 仍包含原 4 项运行时依赖。
+      - `git diff --name-only`：仅 51 个 package JSON 发生变更。
+      - `git diff --stat`：51 个文件各 1 行版本号替换，总计 51 insertions、51 deletions。
+      - `git ls-files --others --exclude-standard`：无输出。
+      - `find services -maxdepth 2 \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.log' -o -name '.env' -o -name 'coverage' \) -print | sort`：无输出。
+    - 审计与例外：
+      - 本任务只覆盖 dependency 声明；`services/tests/validate-service-package.test.mjs`、service README 和设计文档示例仍由任务 2.2 更新。
+      - 本地 ignored 的 `services/package-lock.json` 和 `services/node_modules` 未进入 `git status` 或提交范围。
     - 下一目标：任务 2.2。
 
 - [ ] 2.2 更新依赖版本相关 fixture 和文档示例
