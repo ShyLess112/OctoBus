@@ -300,6 +300,57 @@ test('config and secret aliases supply bindings', async () => {
   assert.equal(result.message, 'unblock ip succeeded');
 });
 
+test('secret key overrides deprecated config and legacy binding credentials', async () => {
+  let captured;
+  setFetch(async (url, init) => {
+    captured = { url, init };
+    return {
+      status: 200,
+      text: async () => JSON.stringify({ code: 0 }),
+    };
+  });
+
+  const result = await callHandler(METHOD_BLOCK_IP_FULL, { ip: '1.1.1.1' }, {
+    bindings: {
+      restBaseUrl: 'http://legacy.local',
+      key: 'legacy-binding-key',
+    },
+    config: {
+      restBaseUrl: 'http://config.local',
+      key: 'deprecated-config-key',
+    },
+    secret: {
+      key: 'secret-key',
+    },
+    limits: {},
+  });
+
+  assert.match(captured.url, /^http:\/\/config\.local\/facade\/unifiedInterface\.php/);
+  assert.match(captured.url, /auth_key=secret-key/);
+  assert.equal(result.message, 'block ip succeeded');
+});
+
+test('deprecated config key remains a lower-priority fallback', async () => {
+  let captured;
+  setFetch(async (url, init) => {
+    captured = { url, init };
+    return {
+      status: 200,
+      text: async () => JSON.stringify({ code: 0 }),
+    };
+  });
+
+  await callHandler(METHOD_BLOCK_IP_FULL, { ip: '1.1.1.1' }, {
+    config: {
+      restBaseUrl: 'http://config.local',
+      key: 'deprecated-config-key',
+    },
+    limits: {},
+  });
+
+  assert.match(captured.url, /auth_key=deprecated-config-key/);
+});
+
 test('helpers cover parser, classifier, logging, and fallback branches', async () => {
   assert.equal(typeof service, 'object');
   assert.deepEqual(_test.mergeObject(null, { a: 1, b: undefined }, { b: 2 }), { a: 1, b: 2 });

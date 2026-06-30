@@ -47,6 +47,8 @@ Use `secret` for the Hunter API Key:
 }
 ```
 
+Deprecated compatibility only: `config.apiKey` and `config.api_key` are still accepted as lower-priority fallbacks for older instances, but `secret` values always take precedence. Request `api_key` is ignored by the service.
+
 > **API Key 获取方式**: 登录 `hunter.qianxin.com` → 个人中心 → API 管理。
 
 ## RPC Methods
@@ -115,7 +117,7 @@ component="nginx" && country="CN"
 | Scenario | gRPC Status |
 |----------|-------------|
 | Missing/invalid `query` parameter | `INVALID_ARGUMENT` |
-| Missing/invalid `api_key` | `INVALID_ARGUMENT` |
+| Missing/invalid secret `apiKey` | `INVALID_ARGUMENT` |
 | Invalid page/page_size/is_web | `INVALID_ARGUMENT` |
 | HTTP 401 (upstream auth failure) | `UNAUTHENTICATED` |
 | HTTP 403 (upstream permission denied) | `PERMISSION_DENIED` |

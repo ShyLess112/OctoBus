@@ -14,8 +14,32 @@ octobus service import --id nsfocus-ads-v4-5-r90-f06 ./services//nsfocus__ads_v4
 
 - `BlockIP` calls `/facade/unifiedInterface.php` with `target=blackList` and `action_type=add`.
 - `UnblockIP` calls the same upstream path with `action_type=delete`.
-- `restBaseUrl` or `baseUrl` and `key` are read from bindings/config/secret.
+- `restBaseUrl` or `baseUrl` are read from instance config.
+- `key` is read from instance secret. Deprecated config or legacy binding credentials are accepted only as lower-priority compatibility fallbacks.
 - `BlockIP` treats `content.actionErrors[0]` containing `记录已在黑名单中` as idempotent success.
+
+## Configuration
+
+Use `config` for the ADS base URL and HTTP settings:
+
+```json
+{
+  "restBaseUrl": "https://ads.example",
+  "timeoutMs": 5000,
+  "headers": {
+    "X-Custom": "value"
+  },
+  "skipTlsVerify": false
+}
+```
+
+Use `secret` for the upstream `auth_key`:
+
+```json
+{
+  "key": "replace-with-auth-key"
+}
+```
 
 ## Local Checks
 

@@ -44,6 +44,8 @@ Use `token` for the Fortinet bearer token. Aliases `accessToken` and `access_tok
 }
 ```
 
+Deprecated compatibility only: `config.token`, `config.accessToken`, and `config.access_token` are still accepted as lower-priority fallbacks for older instances, but `secret` values always take precedence.
+
 ## RPC Methods
 
 - `Fortinet_FW.Fortinet_FW/CreateAddress`

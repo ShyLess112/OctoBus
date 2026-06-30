@@ -13,12 +13,20 @@ const updateDetectorStatePath = '/Chaitin_WAF_SAFELINE.Chaitin_WAF_SAFELINE/Upda
 const blockIpPath = '/Chaitin_WAF_SAFELINE.Chaitin_WAF_SAFELINE/BlockIP';
 const unblockIpPath = '/Chaitin_WAF_SAFELINE.Chaitin_WAF_SAFELINE/UnblockIP';
 
-const buildCtx = (req = {}, overrides = {}) => ({
-  bindings: { restBaseUrl: 'http://localhost:18080', headers: { 'X-Extra': 'demo' }, ...overrides.bindings },
-  limits: { timeoutMs: 10_000, ...overrides.limits },
-  meta: { instance_id: 'inst', request_id: 'req', ...overrides.meta },
-  req,
-});
+const buildCtx = (req = {}, overrides = {}) => {
+  const legacyToken = req?.api_token ?? req?.apiToken;
+  const secret = overrides.secret === undefined && legacyToken !== undefined
+    ? { api_token: legacyToken }
+    : (overrides.secret || {});
+  return {
+    bindings: { restBaseUrl: 'http://localhost:18080', headers: { 'X-Extra': 'demo' }, ...overrides.bindings },
+    config: overrides.config || {},
+    secret,
+    limits: { timeoutMs: 10_000, ...overrides.limits },
+    meta: { instance_id: 'inst', request_id: 'req', ...overrides.meta },
+    req,
+  };
+};
 
 const setFetch = (impl) => {
   global.fetch = impl;
@@ -99,9 +107,9 @@ test('internal helpers normalize bindings, headers, errors, and call context', a
   const { _test } = await import('../src/safeline-waf.js');
 
   assert.deepEqual(_test.mergedBindings({
-    config: { endpoint: 'http://config', keep: 'config' },
+    config: { endpoint: 'http://config', keep: 'config', apiToken: 'config-token' },
     secret: { apiToken: 'secret' },
-    bindings: { endpoint: 'http://binding' },
+    bindings: { endpoint: 'http://binding', apiToken: 'binding-token' },
   }), {
     endpoint: 'http://binding',
     keep: 'config',
@@ -1115,11 +1123,13 @@ test('SDK handlers accept single context with config and secret', async () => {
     config: {
       endpoint: 'http://localhost:18080',
       headers: { 'X-Extra': 'sdk' },
+      apiToken: 'config-token',
     },
     secret: {
       apiToken: 'secret-token',
     },
     request: {
+      api_token: 'request-token',
       id__in: [42],
     },
     meta: {

@@ -17,12 +17,14 @@ const originalConsoleLog = console.log;
 
 const buildCtx = (overrides = {}) => ({
   bindings: {
-    webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=test-token',
-    secret: 'test-secret',
     ...(overrides.bindings || {}),
   },
   config: overrides.config || {},
-  secret: overrides.secret || {},
+  secret: {
+    webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=test-token',
+    secret: 'test-secret',
+    ...(overrides.secret || {}),
+  },
   limits: { timeoutMs: 2000, ...(overrides.limits || {}) },
   meta: { instance_id: 'inst', request_id: 'req', ...(overrides.meta || {}) },
   req: overrides.req || {},
@@ -44,18 +46,18 @@ test('SendTextMessage rejects missing and invalid webhook_url', async () => {
   };
 
   await assert.rejects(
-    () => rpcdef(buildCtx({ bindings: { webhook_url: '', secret: 'test-secret' }, req: { send_msg: 'test' } }))[METHOD_SEND_TEXT_PATH](),
+    () => rpcdef(buildCtx({ secret: { webhook_url: '', secret: 'test-secret' }, req: { send_msg: 'test' } }))[METHOD_SEND_TEXT_PATH](),
     (err) => {
       assert.ok(err instanceof GrpcError);
       assert.equal(err.code, grpcStatus.INVALID_ARGUMENT);
       assert.equal(err.legacyCode, 'INVALID_ARGUMENT');
-      assert.match(err.message, /webhook_url is required/);
+      assert.match(err.message, /webhook_url is required in instance secret/);
       return true;
     },
   );
 
   await assert.rejects(
-    () => rpcdef(buildCtx({ bindings: { webhook_url: 'invalid-url' }, req: { send_msg: 'test' } }))[METHOD_SEND_TEXT_PATH](),
+    () => rpcdef(buildCtx({ secret: { webhook_url: 'invalid-url' }, req: { send_msg: 'test' } }))[METHOD_SEND_TEXT_PATH](),
     /webhook_url must be a valid HTTP\/HTTPS URL/,
   );
 });
@@ -233,7 +235,10 @@ test('SendTextMessage works without secret and maps all mention fields', async (
   };
 
   const res = await rpcdef(buildCtx({
-    bindings: { secret: '' },
+    secret: {
+      webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=test-token',
+      secret: '',
+    },
     limits: { timeoutMs: 0 },
     req: {
       sendMessage: 'all hands',
@@ -253,7 +258,7 @@ test('SendTextMessage works without secret and maps all mention fields', async (
   assert.deepEqual(body.at.atUserIds, ['user001', 'user002']);
 });
 
-test('SDK handler merges config and secret fields', async () => {
+test('SDK handler uses deprecated config webhook fallback when secret is absent', async () => {
   let capturedUrl = '';
   let capturedBody = '';
 
@@ -265,12 +270,11 @@ test('SDK handler merges config and secret fields', async () => {
 
   const res = await handlers[METHOD_SEND_TEXT_FULL]({
     config: {
-      webhookUrl: 'https://oapi.dingtalk.com/robot/send?access_token=secret-token',
+      webhookUrl: 'https://oapi.dingtalk.com/robot/send?access_token=config-token',
       timeout_ms: 3100,
+      secret: 'config-signing-secret',
     },
-    secret: {
-      dingding_secret: 'secret-value',
-    },
+    secret: {},
     request: {
       send_msg: 'from sdk',
       is_groupsendall: { value: false },
@@ -279,10 +283,57 @@ test('SDK handler merges config and secret fields', async () => {
   });
 
   assert.equal(res.http_status, 200);
-  assert.match(capturedUrl, /access_token=secret-token/);
+  assert.match(capturedUrl, /access_token=config-token/);
   assert.match(capturedUrl, /timestamp=/);
   assert.equal(JSON.parse(capturedBody).text.content, 'from sdk');
   assert.ok(service);
+});
+
+test('ctx.secret webhook and signing secret override deprecated config and bindings fallbacks', async () => {
+  let capturedUrl = '';
+
+  globalThis.fetch = async (url) => {
+    capturedUrl = url;
+    return mockResponse(200, { errcode: 0, errmsg: 'ok' });
+  };
+
+  const res = await handlers[METHOD_SEND_TEXT_FULL]({
+    bindings: {
+      webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=binding-token',
+      secret: 'binding-signing-secret',
+    },
+    config: {
+      webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=config-token',
+      secret: 'config-signing-secret',
+    },
+    secret: {
+      webhook_url: 'https://oapi.dingtalk.com/robot/send?access_token=secret-token',
+      secret: 'secret-signing-secret',
+    },
+    request: {
+      send_msg: 'from secret',
+    },
+  });
+
+  assert.equal(res.http_status, 200);
+  assert.match(capturedUrl, /access_token=secret-token/);
+  assert.doesNotMatch(capturedUrl, /access_token=config-token/);
+  assert.doesNotMatch(capturedUrl, /access_token=binding-token/);
+  assert.equal(_test.resolveWebhookUrl({
+    secret: { webhook_url: 'secret' },
+    config: { webhook_url: 'config' },
+    bindings: { webhook_url: 'binding' },
+  }), 'secret');
+  assert.equal(_test.resolveSigningSecret({
+    secret: { secret: 'secret' },
+    config: { secret: 'config' },
+    bindings: { secret: 'binding' },
+  }), 'secret');
+  assert.equal(_test.resolveWebhookUrl({
+    secret: {},
+    config: { webhook_url: 'config' },
+    bindings: { webhook_url: 'binding' },
+  }), 'config');
 });
 
 test('null request fallback and helper defaults are stable', async () => {
@@ -292,7 +343,7 @@ test('null request fallback and helper defaults are stable', async () => {
   assert.equal(res.http_status, 200);
 
   assert.equal(_test.firstDefined(undefined, null, 'x'), 'x');
-  assert.deepEqual(_test.mergedBindings({ config: { a: 1 }, secret: { b: 2 }, bindings: { c: 3 } }), { a: 1, b: 2, c: 3 });
+  assert.deepEqual(_test.mergedBindings({ config: { a: 1, webhook_url: 'config' }, secret: { b: 2, webhook_url: 'secret' }, bindings: { c: 3, webhook_url: 'binding' } }), { a: 1, b: 2, c: 3, webhook_url: 'secret' });
   assert.deepEqual(_test.resolveCallContext({ request: { send_msg: 'x' } }).req, { send_msg: 'x' });
   assert.deepEqual(_test.resolveCallContext({ req: null, request: null }).req, {});
   assert.equal(_test.resolveTimeoutMs({ bindings: { timeoutMs: -1 }, limits: { timeoutMs: 0 } }), 5000);

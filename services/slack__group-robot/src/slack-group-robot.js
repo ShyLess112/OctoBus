@@ -45,9 +45,16 @@ const resolveBindingString = (bindings, keys) => {
 
 const mergedBindings = (ctx = {}) => ({
   ...(ctx?.config ?? {}),
-  ...(ctx?.secret ?? {}),
   ...(ctx?.bindings ?? {}),
+  ...(ctx?.secret ?? {}),
 });
+
+const resolveWebhook = (ctx = {}) => {
+  const keys = ['webhook', 'webhook_url', 'webhookUrl', 'url'];
+  return resolveBindingString(ctx.secret || {}, keys)
+    || resolveBindingString(ctx.config || {}, keys)
+    || resolveBindingString(ctx.bindings || {}, keys);
+};
 
 const resolveCallContext = (ctx = {}) => ({
   ...ctx,
@@ -126,9 +133,9 @@ const sendToSlack = async (ctx, webhook, payload, log) => {
 
 const handleSendTextMessage = async (req, ctx) => {
   const callCtx = resolveCallContext(ctx);
-  const webhook = normalizeWebhook(resolveBindingString(callCtx.bindings, ['webhook', 'webhook_url', 'webhookUrl', 'url']));
+  const webhook = normalizeWebhook(resolveWebhook(callCtx));
   if (!webhook) {
-    throw errorWithCode('INVALID_ARGUMENT', 'webhook is required (https://hooks.slack.com/services/T.../B.../xxxx)');
+    throw errorWithCode('INVALID_ARGUMENT', 'webhook is required in instance secret (https://hooks.slack.com/services/T.../B.../xxxx)');
   }
 
   const message = coerceString(firstDefined(req?.message, req?.send_msg, req?.sendMsg, req?.text)).trim();
@@ -171,6 +178,7 @@ rpcdef.__test__ = {
   resolveBindingString,
   resolveCallContext,
   resolveTimeoutMs,
+  resolveWebhook,
   sendToSlack,
 };
 

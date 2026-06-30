@@ -116,8 +116,8 @@ const firstDefined = (...vals) => vals.find((v) => v !== undefined && v !== null
 
 const mergedBindings = (ctx = {}) => ({
   ...(ctx?.config ?? {}),
-  ...(ctx?.secret ?? {}),
   ...(ctx?.bindings ?? {}),
+  ...(ctx?.secret ?? {}),
 });
 
 const parseHeaders = (value) => {
@@ -359,11 +359,11 @@ export function rpcdef(ctx) {
   const skipTlsVerify = Boolean(bindings.tlsInsecureSkipVerify || bindings.skipTlsVerify || bindings.skip_tls_verify || bindings.tls_insecure_skip_verify);
 
   const requestWithDefaults = (req = {}) => {
-    const token = firstDefined(req?.api_token, req?.apiToken, bindings.api_token, bindings.apiToken);
+    const token = firstDefined(bindings.api_token, bindings.apiToken);
     if (token === undefined || token === null) return req ?? {};
     return {
-      api_token: token,
       ...(req ?? {}),
+      api_token: token,
     };
   };
 

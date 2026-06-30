@@ -68,9 +68,9 @@ const normalizeBaseUrl = (value) => {
 };
 
 const mergedBindings = (ctx = {}) => ({
+  ...(ctx?.bindings ?? {}),
   ...(ctx?.config ?? {}),
   ...(ctx?.secret ?? {}),
-  ...(ctx?.bindings ?? {}),
 });
 
 const resolveCallContext = (ctx = {}) => ({

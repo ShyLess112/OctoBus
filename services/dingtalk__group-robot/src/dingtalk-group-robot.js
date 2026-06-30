@@ -74,9 +74,23 @@ const resolveBindingString = (bindings, keys) => {
 
 const mergedBindings = (ctx = {}) => ({
   ...(ctx?.config ?? {}),
-  ...(ctx?.secret ?? {}),
   ...(ctx?.bindings ?? {}),
+  ...(ctx?.secret ?? {}),
 });
+
+const resolveWebhookUrl = (ctx = {}) => {
+  const keys = ['webhook_url', 'webhookUrl', 'webhook', 'url'];
+  return resolveBindingString(ctx.secret || {}, keys)
+    || resolveBindingString(ctx.config || {}, keys)
+    || resolveBindingString(ctx.bindings || {}, keys);
+};
+
+const resolveSigningSecret = (ctx = {}) => {
+  const keys = ['secret', 'dingding_secret'];
+  return resolveBindingString(ctx.secret || {}, keys)
+    || resolveBindingString(ctx.config || {}, keys)
+    || resolveBindingString(ctx.bindings || {}, keys);
+};
 
 const resolveCallContext = (ctx = {}) => ({
   ...ctx,
@@ -190,18 +204,17 @@ const sendToDingTalk = async (config, log) => {
 
 const handleSendTextMessage = async (req, ctx) => {
   const callCtx = resolveCallContext(ctx);
-  const bindings = callCtx.bindings || {};
   const log = createLogger(callCtx.meta);
 
-  const webhookUrl = resolveBindingString(bindings, ['webhook_url', 'webhookUrl', 'webhook', 'url']);
+  const webhookUrl = resolveWebhookUrl(callCtx);
   if (!webhookUrl) {
-    throw errorWithCode('INVALID_ARGUMENT', 'webhook_url is required in bindings');
+    throw errorWithCode('INVALID_ARGUMENT', 'webhook_url is required in instance secret');
   }
   if (!/^https?:\/\//i.test(webhookUrl)) {
     throw errorWithCode('INVALID_ARGUMENT', 'webhook_url must be a valid HTTP/HTTPS URL');
   }
 
-  const secret = resolveBindingString(bindings, ['secret', 'dingding_secret']);
+  const secret = resolveSigningSecret(callCtx);
   const sendMsg = coerceString(firstDefined(req?.send_msg, req?.sendMsg, req?.send_message, req?.sendMessage));
   if (!sendMsg.trim()) {
     throw errorWithCode('INVALID_ARGUMENT', 'send_msg is required and must not be empty');
@@ -273,7 +286,9 @@ rpcdef.__test__ = {
   registerHandlers,
   resolveBindingString,
   resolveCallContext,
+  resolveSigningSecret,
   resolveTimeoutMs,
+  resolveWebhookUrl,
   sendToDingTalk,
   toBase64,
   toBoolean,

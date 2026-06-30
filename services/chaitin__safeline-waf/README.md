@@ -35,7 +35,7 @@ Use `endpoint` for the SafeLine REST API base URL. Legacy aliases `restBaseUrl`,
 }
 ```
 
-Use `secret.apiToken` or `secret.api_token` for the default SafeLine `API-TOKEN` header:
+Use `secret.apiToken` or `secret.api_token` for the SafeLine `API-TOKEN` header:
 
 ```json
 {
@@ -43,7 +43,7 @@ Use `secret.apiToken` or `secret.api_token` for the default SafeLine `API-TOKEN`
 }
 ```
 
-Requests may still pass `api_token` or `apiToken`; request values take precedence over the configured secret token.
+Deprecated request `api_token` / `apiToken` and deprecated config token fields are ignored when instance secret provides a token. If a config token fallback is retained for compatibility, it has lower priority than `secret`.
 
 ## RPC Methods
 

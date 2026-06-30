@@ -406,6 +406,54 @@ test('SDK handlers merge config and secret and expose all methods', async () => 
   ].sort());
 });
 
+test('SDK handlers prefer secret token over deprecated config and legacy bindings', async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return okResponse(JSON.stringify({ status: 'success', http_status: 200 }));
+  };
+
+  await handlers[METHOD_CREATE_ADDRESS_FULL]({
+    bindings: {
+      restBaseUrl: 'https://legacy-device.example',
+      token: 'legacy-binding-token',
+    },
+    config: {
+      restBaseUrl: 'https://config-device.example',
+      token: 'deprecated-config-token',
+    },
+    secret: {
+      token: 'secret-token',
+    },
+    request: {
+      ip: '203.0.113.21',
+    },
+  });
+
+  assert.equal(captured.url, 'https://config-device.example/api/v2/cmdb/firewall/address');
+  assert.equal(captured.init.headers.Authorization, 'Bearer secret-token');
+});
+
+test('SDK handlers keep deprecated config token as lower-priority fallback', async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    return okResponse(JSON.stringify({ status: 'success', http_status: 200 }));
+  };
+
+  await handlers[METHOD_CREATE_ADDRESS_FULL]({
+    config: {
+      restBaseUrl: 'https://config-device.example',
+      token: 'deprecated-config-token',
+    },
+    request: {
+      ip: '203.0.113.22',
+    },
+  });
+
+  assert.equal(captured.init.headers.Authorization, 'Bearer deprecated-config-token');
+});
+
 test('direct handlers cover get, delete, group, and member SDK paths', async () => {
   globalThis.fetch = async (url, init) => {
     if (url.includes('/firewall/address') && init.method === 'POST') {
@@ -458,7 +506,7 @@ test('helper functions keep legacy-compatible edge behavior', async () => {
   assert.equal(_test.hasOwn({ a: 1 }, 'a'), true);
   assert.equal(_test.hasOwn(null, 'a'), false);
   assert.equal(_test.firstDefined(undefined, null, 'x'), 'x');
-  assert.deepEqual(_test.mergedBindings({ config: { a: 1 }, secret: { b: 2 }, bindings: { c: 3 } }), { a: 1, b: 2, c: 3 });
+  assert.deepEqual(_test.mergedBindings({ config: { a: 1 }, secret: { b: 2 }, bindings: { c: 3 } }), { c: 3, a: 1, b: 2 });
   assert.deepEqual(_test.resolveCallContext({ request: { ip: '1.1.1.1' } }).req, { ip: '1.1.1.1' });
   assert.deepEqual(_test.readRepeatedStrings({ values: [{ value: 'a' }, 'b'] }), ['a', 'b']);
   assert.deepEqual(_test.readRepeatedStrings('bad'), []);

@@ -12,8 +12,8 @@ octobus service import --id dingtalk-group-robot ./services//dingtalk__group-rob
 
 - `service.json`: OctoBus service manifest.
 - `proto/dingtalk_group_robot.proto`: gRPC API definition.
-- `config.schema.json`: non-secret webhook URL, signing-secret alias, and timeout settings.
-- `secret.schema.json`: DingTalk signing secret fields.
+- `config.schema.json`: non-secret timeout settings plus deprecated credential fallbacks.
+- `secret.schema.json`: DingTalk webhook URL and optional signing secret fields.
 - `src/dingtalk-group-robot.js`: DingTalk webhook implementation.
 - `src/service.js`: OctoBus SDK `defineService` wrapper.
 - `bin/dingtalk-group-robot.js`: service-local executable entrypoint.
@@ -22,22 +22,24 @@ octobus service import --id dingtalk-group-robot ./services//dingtalk__group-rob
 
 ## Configuration
 
-Use `webhook_url` for the DingTalk custom robot webhook URL. Legacy aliases `webhookUrl`, `webhook`, and `url` are also accepted.
+Use config for non-secret runtime settings:
 
 ```json
 {
-  "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=replace-me",
   "timeoutMs": 5000
 }
 ```
 
-Use `secret.secret` or `secret.dingding_secret` for the DingTalk signing secret when the robot has signing enabled:
+Use secret for the DingTalk custom robot webhook URL and optional signing secret:
 
 ```json
 {
+  "webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=replace-me",
   "secret": "replace-with-signing-secret"
 }
 ```
+
+Deprecated config fields `webhook_url`, `webhookUrl`, `webhook`, `url`, `secret`, and `dingding_secret` remain fallback-only for old instances. Values in instance secret take priority over those config or binding fallbacks.
 
 ## RPC Methods
 

@@ -18,16 +18,23 @@ octobus service import --id slack-group-robot ./services/slack__group-robot
 
 ## Configuration
 
-Use `webhook` for the Slack Incoming Webhook URL. Legacy aliases `webhook_url`, `webhookUrl`, and `url` are also accepted.
+Use config for non-secret runtime settings:
 
 ```json
 {
-  "webhook": "https://hooks.slack.com/services/T00/B00/xxxx",
   "timeoutMs": 5000
 }
 ```
 
-No secret is required — Slack Incoming Webhooks embed authentication tokens directly in the URL. The `secret.schema.json` is empty and reserved for future extensions.
+Use secret for the Slack Incoming Webhook URL, because the URL embeds authentication tokens:
+
+```json
+{
+  "webhook": "https://hooks.slack.com/services/T00/B00/xxxx"
+}
+```
+
+Deprecated config fields `webhook`, `webhook_url`, `webhookUrl`, and `url` remain fallback-only for old instances. Values in instance secret take priority over those config or binding fallbacks.
 
 ## RPC Methods
 
@@ -59,22 +66,22 @@ Send a text message to a Slack channel via Incoming Webhook.
 | HTTP non-200 response (4xx/5xx) | `UNAVAILABLE` |
 | Network failure (DNS, timeout, connection refused) | `UNAVAILABLE` (http_status=0, http_body empty) |
 
-## Suggested Capset
+## Suggested Instance Values
+
+Config:
 
 ```json
 {
-  "name": "slack-notify",
-  "description": "Send alert notifications to Slack channel",
-  "bindings": {
-    "webhook": "https://hooks.slack.com/services/..."
-  }
+  "timeoutMs": 5000
 }
 ```
 
-Add the capset to an instance:
+Secret:
 
-```bash
-octobus capset add-instance --instance <name> --capset slack-notify
+```json
+{
+  "webhook": "https://hooks.slack.com/services/..."
+}
 ```
 
 ## Operation Semantics
@@ -91,15 +98,15 @@ octobus capset add-instance --instance <name> --capset slack-notify
 - **Duplicate messages on retry**: Network failures trigger `UNAVAILABLE`, but the upstream Slack may have already delivered the message. Callers must handle potential duplicates in alert pipelines.
 - **Rate limiting**: Slack enforces per-channel rate limits. Excessive traffic may trigger 429 responses (mapped to `UNAVAILABLE`). Configure appropriate throttling in your alert pipeline.
 - **Message delivery is best-effort**: Slack Incoming Webhooks have no delivery confirmation beyond HTTP 200. There is no retry or queue at the Slack side.
-- **URL rotation**: Slack webhook URLs can be regenerated from the Slack admin panel. Rotating the URL invalidates the old one — update the instance config accordingly.
+- **URL rotation**: Slack webhook URLs can be regenerated from the Slack admin panel. Rotating the URL invalidates the old one — update the instance secret accordingly.
 - **Channel deletion**: If the target channel is deleted, the webhook returns HTTP 404. Re-create the webhook for a new channel.
 
 ## Package Files
 
 - `service.json`: OctoBus service manifest.
 - `proto/slack_group_robot.proto`: gRPC API definition.
-- `config.schema.json`: webhook URL and timeout settings.
-- `secret.schema.json`: reserved for future auth (currently empty).
+- `config.schema.json`: non-secret timeout settings plus deprecated webhook fallbacks.
+- `secret.schema.json`: Slack Incoming Webhook URL.
 - `src/slack-group-robot.js`: Slack webhook implementation.
 - `src/service.js`: OctoBus SDK `defineService` wrapper.
 - `bin/slack-group-robot.js`: service-local executable entrypoint.

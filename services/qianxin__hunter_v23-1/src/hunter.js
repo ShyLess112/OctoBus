@@ -80,7 +80,7 @@ const mapSearchResult = (item) => ({
 // ---- RPC definition ----
 
 export function rpcdef(ctx) {
-  const bindings = { ...(ctx?.config ?? {}), ...(ctx?.secret ?? {}), ...(ctx?.bindings ?? {}) };
+  const bindings = { ...(ctx?.bindings ?? {}), ...(ctx?.config ?? {}), ...(ctx?.secret ?? {}) };
   const baseUrl = bindings.baseUrl || bindings.base_url || DEFAULT_BASE_URL;
   const timeoutMs = bindings.timeoutMs || ctx?.limits?.timeoutMs || DEFAULT_TIMEOUT_MS;
   const defaultPageSize = bindings.defaultPageSize || DEFAULT_PAGE_SIZE;
@@ -113,9 +113,9 @@ export function rpcdef(ctx) {
     }
 
     // --- api key ---
-    const apiKey = firstDefined(req?.api_key, req?.apiKey, bindings.apiKey, bindings.api_key);
+    const apiKey = firstDefined(bindings.apiKey, bindings.api_key);
     if (!apiKey || !String(apiKey).trim()) {
-      throw errorWithCode('INVALID_ARGUMENT', 'api_key is required (configure in secret or pass in request)');
+      throw errorWithCode('INVALID_ARGUMENT', 'apiKey is required in secret');
     }
 
     // --- page ---
