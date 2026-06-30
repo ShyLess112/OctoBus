@@ -35,6 +35,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const response = (status, body) => ({
   ok: status >= 200 && status < 300,
   status,
@@ -89,27 +94,27 @@ test('service exports handlers and rpcdef paths', () => {
 
 test('rejects missing required connection and request fields', async () => {
   await expectGrpcError(
-    () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: '', ip_directives: ['203.0.113.1'] }, buildCtx()),
+    () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: '', ip_directives: ['203.0.113.1'] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /environment_name/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { host: '', restBaseUrl: '', baseUrl: '' } })),
+    () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { host: '', restBaseUrl: '', baseUrl: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /https URL/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { username: '', user: '' } })),
+    () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { username: '', user: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /username/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { password: '' } })),
+    () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx({ bindings: { password: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /password/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: [] }, buildCtx()),
+    () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: [] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /ip_directives/),
   );
@@ -119,7 +124,7 @@ test('invalid IPs short-circuit without network calls', async () => {
   setFetch(async () => {
     throw new Error('should not fetch');
   });
-  const result = await handlers[METHOD_BATCH_BLOCK_FULL](
+  const result = await callHandler(METHOD_BATCH_BLOCK_FULL,
     { environment_name: 'prod', ip_directives: ['bad-ip', { description: 'missing ip' }, { ip: '999.0.0.1' }, 42] },
     buildCtx(),
   );
@@ -141,7 +146,7 @@ test('batches block requests and annotates work orders', async () => {
     return response(200, { code: 200, data: { id: calls.length === 3 ? 'wo-1' : 'wo-2' } });
   });
 
-  const result = await handlers[METHOD_BATCH_BLOCK_FULL](
+  const result = await callHandler(METHOD_BATCH_BLOCK_FULL,
     {
       environmentName: 'prod',
       ipDirectives: { values: ips },
@@ -198,36 +203,36 @@ test('transport protocol business and network errors map correctly', async () =>
   for (const [status, legacyCode] of [[401, 'UNAUTHENTICATED'], [403, 'PERMISSION_DENIED'], [404, 'FAILED_PRECONDITION'], [500, 'UNAVAILABLE']]) {
     setFetch(async () => response(status, { code: status, message: 'bad'.repeat(100) }));
     await expectGrpcError(
-      () => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()),
+      () => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()),
       legacyCode,
       (err) => assert.match(err.message, new RegExp(`login.*${status}`)),
     );
   }
 
   setFetch(async () => response(200, ''));
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNKNOWN', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNKNOWN', (err) => {
     assert.match(err.message, /empty/);
   });
 
   setFetch(async () => response(200, 'not-json'));
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNKNOWN', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNKNOWN', (err) => {
     assert.match(err.message, /not valid JSON/);
   });
 
   setFetch(async () => response(200, { code: 401, data: null, message: 'denied' }));
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /login failed: denied/);
   });
 
   setFetch(async () => response(200, { code: 200, data: { value: '' } }));
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNAUTHENTICATED', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNAUTHENTICATED', (err) => {
     assert.match(err.message, /access token missing/);
   });
 
   setFetch(async () => {
     throw new Error('');
   });
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
     assert.match(err.message, /fetch failed/);
   });
 });
@@ -237,7 +242,7 @@ test('environment and work order protocol errors map correctly', async () => {
     if (String(url).includes('/auth/')) return response(200, { code: 200, data: { accessTokenValue: 'token-1' } });
     return response(200, { code: 200, data: [] });
   });
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /environment prod not found/);
   });
 
@@ -246,7 +251,7 @@ test('environment and work order protocol errors map correctly', async () => {
     if (String(url).includes('/environment/')) return response(200, { code: 200, data: [{ name: 'prod' }] });
     return response(200, { code: 200, data: { id: 'wo-1' } });
   });
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /missing id/);
   });
 
@@ -255,7 +260,7 @@ test('environment and work order protocol errors map correctly', async () => {
     if (String(url).includes('/environment/')) return response(200, { code: 200, data: [{ id: 'env-1', name: 'prod' }] });
     return response(200, { code: 500, data: null, message: 'forced work order failure' });
   });
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /work order failed/);
   });
 
@@ -264,7 +269,7 @@ test('environment and work order protocol errors map correctly', async () => {
     if (String(url).includes('/environment/')) return response(200, { code: 200, data: [{ id: 'env-1', name: 'prod' }] });
     return response(200, { code: 200, data: {} });
   });
-  await expectGrpcError(() => handlers[METHOD_BATCH_BLOCK_FULL]({ environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BATCH_BLOCK_FULL, { environment_name: 'prod', ip_directives: ['203.0.113.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /missing id/);
   });
 });
@@ -462,7 +467,7 @@ test('mock upstream handles full lifecycle', async () => {
       },
     });
 
-    const result = await handlers[METHOD_BATCH_BLOCK_FULL](
+    const result = await callHandler(METHOD_BATCH_BLOCK_FULL,
       { environment_name: 'prod', ip_directives: [{ ip: '192.0.2.10' }] },
       ctx,
     );

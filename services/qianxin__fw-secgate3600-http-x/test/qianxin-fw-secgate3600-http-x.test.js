@@ -32,6 +32,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const createHeaders = (entries = {}) => {
   const map = new Map();
   for (const [key, value] of Object.entries(entries)) {
@@ -182,7 +187,7 @@ test('UnblockIP sets undo flag and respects optional fields', async () => {
     return response(200, JSON.stringify({ result: 'ok' }));
   });
 
-  await handlers[METHOD_UNBLOCK_FULL]({
+  await callHandler(METHOD_UNBLOCK_FULL, {
     host: 'http://device.local',
     uuid: 'token-uuid',
     ip: '5.6.7.8',

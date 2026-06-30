@@ -168,8 +168,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const normalizeBaseUrl = (rawUrl) => {
   const value = pickFirstString([rawUrl]);
@@ -394,8 +396,8 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_BATCH_BLOCK_FULL]: (req, ctx = {}) => runBatchBlock(req, ctx),
-  [METHOD_REMOVE_IP_FULL]: (req, ctx = {}) => runRemove(req, ctx),
+  [METHOD_BATCH_BLOCK_FULL]: (ctx = {}) => runBatchBlock(requestFromContext(ctx), ctx),
+  [METHOD_REMOVE_IP_FULL]: (ctx = {}) => runRemove(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

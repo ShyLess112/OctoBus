@@ -83,8 +83,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const optionalUint32 = (value) => {
   const raw = value && typeof value === 'object' && hasOwn(value, 'value') ? value.value : value;
@@ -406,14 +408,14 @@ const handleBatchOperation = async (ctx, type) => {
 export function rpcdef(ctx = {}) {
   const callCtx = resolveCallContext(ctx);
   return {
-    [METHOD_BATCH_BLOCK_PATH]: async (req) => handleBatchOperation({ ...callCtx, req: req ?? callCtx.req ?? {} }, 'BLOCKER'),
-    [METHOD_BATCH_UNBLOCK_PATH]: async (req) => handleBatchOperation({ ...callCtx, req: req ?? callCtx.req ?? {} }, 'UN_BLOCKER'),
+    [METHOD_BATCH_BLOCK_PATH]: async (req) => handleBatchOperation({ ...callCtx, req: req ?? callCtx.req ?? {}, request: req ?? callCtx.req ?? {} }, 'BLOCKER'),
+    [METHOD_BATCH_UNBLOCK_PATH]: async (req) => handleBatchOperation({ ...callCtx, req: req ?? callCtx.req ?? {}, request: req ?? callCtx.req ?? {} }, 'UN_BLOCKER'),
   };
 }
 
 export const handlers = {
-  [METHOD_BATCH_BLOCK_FULL]: (req, ctx = {}) => handleBatchOperation({ ...ctx, req }, 'BLOCKER'),
-  [METHOD_BATCH_UNBLOCK_FULL]: (req, ctx = {}) => handleBatchOperation({ ...ctx, req }, 'UN_BLOCKER'),
+  [METHOD_BATCH_BLOCK_FULL]: (ctx = {}) => handleBatchOperation({ ...ctx, request: requestFromContext(ctx) }, 'BLOCKER'),
+  [METHOD_BATCH_UNBLOCK_FULL]: (ctx = {}) => handleBatchOperation({ ...ctx, request: requestFromContext(ctx) }, 'UN_BLOCKER'),
 };
 
 export const _test = {

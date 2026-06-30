@@ -76,8 +76,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const normalizeBaseUrl = (value) => {
   const text = optionalString(value);
@@ -271,7 +273,7 @@ const fetchHttp = async (ctx, url, init = {}) => {
 };
 
 const handleLogin = (req, ctx) => {
-  const callCtx = resolveCallContext({ ...ctx, req });
+  const callCtx = resolveCallContext({ ...ctx, req, request: req });
   const query = buildLoginQuery(callCtx.req || {});
   return fetchHttp(callCtx, buildUrl(resolveHost(callCtx), LOGIN_URI, query), {
     method: 'GET',
@@ -280,7 +282,7 @@ const handleLogin = (req, ctx) => {
 };
 
 const handleBlock = (req, ctx) => {
-  const callCtx = resolveCallContext({ ...ctx, req });
+  const callCtx = resolveCallContext({ ...ctx, req, request: req });
   return fetchHttp(callCtx, buildUrl(resolveHost(callCtx), BLACKLIST_URI, buildBlacklistQuery(callCtx.req || {})), {
     method: 'POST',
     headers: buildHeaders(callCtx, { 'content-type': 'application/json' }),
@@ -289,7 +291,7 @@ const handleBlock = (req, ctx) => {
 };
 
 const handleUnblock = (req, ctx) => {
-  const callCtx = resolveCallContext({ ...ctx, req });
+  const callCtx = resolveCallContext({ ...ctx, req, request: req });
   return fetchHttp(callCtx, buildUrl(resolveHost(callCtx), BLACKLIST_URI, buildBlacklistQuery(callCtx.req || {})), {
     method: 'POST',
     headers: buildHeaders(callCtx, { 'content-type': 'application/json' }),
@@ -307,9 +309,9 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_BLOCK_FULL]: (req, ctx = {}) => handleBlock(req, ctx),
-  [METHOD_UNBLOCK_FULL]: (req, ctx = {}) => handleUnblock(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_BLOCK_FULL]: (ctx = {}) => handleBlock(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_FULL]: (ctx = {}) => handleUnblock(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

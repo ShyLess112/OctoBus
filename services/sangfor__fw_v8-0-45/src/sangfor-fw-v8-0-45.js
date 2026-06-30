@@ -119,8 +119,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const buildLogPrefix = (meta = {}, action) => {
   const labels = [];
@@ -361,10 +363,10 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => makeRuntime({ ...ctx, req }).runLogin(req),
-  [METHOD_BLOCK_FULL]: (req, ctx = {}) => makeRuntime({ ...ctx, req }).runBlock(req),
-  [METHOD_UNBLOCK_FULL]: (req, ctx = {}) => makeRuntime({ ...ctx, req }).runUnblock(req),
-  [METHOD_LOGOUT_FULL]: (req, ctx = {}) => makeRuntime({ ...ctx, req }).runLogout(req),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => makeRuntime({ ...ctx, request: requestFromContext(ctx) }).runLogin(requestFromContext(ctx)),
+  [METHOD_BLOCK_FULL]: (ctx = {}) => makeRuntime({ ...ctx, request: requestFromContext(ctx) }).runBlock(requestFromContext(ctx)),
+  [METHOD_UNBLOCK_FULL]: (ctx = {}) => makeRuntime({ ...ctx, request: requestFromContext(ctx) }).runUnblock(requestFromContext(ctx)),
+  [METHOD_LOGOUT_FULL]: (ctx = {}) => makeRuntime({ ...ctx, request: requestFromContext(ctx) }).runLogout(requestFromContext(ctx)),
 };
 
 export const _test = {

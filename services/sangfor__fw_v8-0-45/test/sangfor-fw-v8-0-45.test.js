@@ -38,6 +38,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const response = (status, body, contentType = 'application/json') => ({
   ok: status >= 200 && status < 300,
   status,
@@ -101,7 +106,7 @@ test('login returns token and passes configured credentials', async () => {
     return response(200, { code: 0, message: 'success', data: { loginResult: { token: 'abc' } } });
   });
 
-  const result = await handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { skipTlsVerify: true } }));
+  const result = await callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { skipTlsVerify: true } }));
   assert.equal(result.code, 0);
   assert.equal(result.token, 'abc');
   assert.equal(captured.url, 'https://fw.example.com/api/v1/namespaces/public/login');
@@ -128,32 +133,32 @@ test('login supports request credential overrides and username alias', async () 
 
 test('validates required base URL credentials token and addresses', async () => {
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { host: '', restBaseUrl: '', baseUrl: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { host: '', restBaseUrl: '', baseUrl: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /host\/restBaseUrl/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { user: '', username: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { user: '', username: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /user is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { password: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { password: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /password is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BLOCK_FULL]({}, buildCtx()),
+    () => callHandler(METHOD_BLOCK_FULL, {}, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /token/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: [] }, buildCtx()),
+    () => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: [] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /non-empty array|at least one IP/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: [null] }, buildCtx()),
+    () => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: [null] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /elements/),
   );
@@ -166,7 +171,7 @@ test('block sends payload, accepts code 17, and supports list aliases', async ()
     return response(200, { code: '17', message: 'exists', data: { existed: ['1.1.1.1'] } });
   });
 
-  const result = await handlers[METHOD_BLOCK_FULL](
+  const result = await callHandler(METHOD_BLOCK_FULL,
     { Token: { value: 'tok' }, ip_list: { values: ['1.1.1.1', { value: '2.2.2.2' }, ''] }, description: { value: 'SOC block' } },
     buildCtx(),
   );
@@ -188,7 +193,7 @@ test('unblock sends delete payload and accepts code 1004', async () => {
     return response(200, { code: 1004, message: 'not found' });
   });
 
-  const result = await handlers[METHOD_UNBLOCK_FULL]({ token: 'tok', targets: ['1.1.1.1'] }, buildCtx());
+  const result = await callHandler(METHOD_UNBLOCK_FULL, { token: 'tok', targets: ['1.1.1.1'] }, buildCtx());
 
   assert.equal(result.code, 1004);
   assert.ok(captured.url.endsWith('/whiteblacklist?_method=delete'));
@@ -201,13 +206,13 @@ test('logout sends empty payload and requires code zero', async () => {
     captured = { url: String(url), init, body: JSON.parse(init.body) };
     return response(200, { code: 0, message: 'logout success', data: null });
   });
-  const ok = await handlers[METHOD_LOGOUT_FULL]({ token: 'tok' }, buildCtx());
+  const ok = await callHandler(METHOD_LOGOUT_FULL, { token: 'tok' }, buildCtx());
   assert.equal(ok.code, 0);
   assert.equal(captured.url, 'https://fw.example.com/api/v1/namespaces/public/logout');
   assert.deepEqual(captured.body, {});
 
   setFetch(async () => response(200, { code: 10, message: 'deny' }));
-  await expectGrpcError(() => handlers[METHOD_LOGOUT_FULL]({ token: 'tok' }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_LOGOUT_FULL, { token: 'tok' }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /logout failed/);
   });
 });
@@ -216,53 +221,53 @@ test('transport protocol business and network errors map correctly', async () =>
   for (const [status, legacyCode] of [[401, 'PERMISSION_DENIED'], [403, 'PERMISSION_DENIED'], [404, 'FAILED_PRECONDITION'], [500, 'UNAVAILABLE']]) {
     setFetch(async () => response(status, `http ${status}`, 'text/plain'));
     await expectGrpcError(
-      () => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()),
+      () => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()),
       legacyCode,
       (err) => assert.match(err.message, new RegExp(`upstream http ${status}`)),
     );
   }
 
   setFetch(async () => response(200, '', 'application/json'));
-  await expectGrpcError(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', (err) => {
     assert.match(err.message, /empty or invalid/);
   });
 
   setFetch(async () => response(200, 'not-json', 'text/plain'));
-  await expectGrpcError(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', (err) => {
     assert.match(err.message, /not valid JSON/);
   });
 
   setFetch(async () => response(200, { code: 5, message: 'bad credentials' }));
-  await expectGrpcError(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'PERMISSION_DENIED', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'PERMISSION_DENIED', (err) => {
     assert.match(err.message, /login failed: code=5/);
   });
 
   setFetch(async () => response(200, { code: 0, data: { loginResult: { token: '' } } }));
-  await expectGrpcError(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', (err) => {
     assert.match(err.message, /token is empty/);
   });
 
   setFetch(async () => response(200, { code: 99, message: 'blocked' }));
-  await expectGrpcError(() => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /BlockIP failed/);
   });
 
   setFetch(async () => response(200, { code: 99, message: 'blocked' }));
-  await expectGrpcError(() => handlers[METHOD_UNBLOCK_FULL]({ token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_UNBLOCK_FULL, { token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /UnblockIP failed/);
   });
 
   setFetch(async () => {
     throw Object.assign(new Error('outer'), { cause: new Error('timeout') });
   });
-  await expectGrpcError(() => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
     assert.match(err.message, /timeout/);
   });
 
   setFetch(async () => {
     throw new Error('');
   });
-  await expectGrpcError(() => handlers[METHOD_BLOCK_FULL]({ token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
+  await expectGrpcError(() => callHandler(METHOD_BLOCK_FULL, { token: 'tok', addresses: ['1.1.1.1'] }, buildCtx()), 'UNAVAILABLE', (err) => {
     assert.match(err.message, /fetch failed/);
   });
 });
@@ -356,17 +361,17 @@ test('mock upstream handles login block unblock and logout lifecycle', async () 
       },
     });
 
-    const login = await handlers[METHOD_LOGIN_FULL]({}, ctx);
+    const login = await callHandler(METHOD_LOGIN_FULL, {}, ctx);
     assert.ok(login.token);
-    const block = await handlers[METHOD_BLOCK_FULL]({ token: login.token, addresses: ['192.0.2.10'] }, ctx);
+    const block = await callHandler(METHOD_BLOCK_FULL, { token: login.token, addresses: ['192.0.2.10'] }, ctx);
     assert.equal(block.code, 0);
-    const blockAgain = await handlers[METHOD_BLOCK_FULL]({ token: login.token, addresses: ['192.0.2.10'] }, ctx);
+    const blockAgain = await callHandler(METHOD_BLOCK_FULL, { token: login.token, addresses: ['192.0.2.10'] }, ctx);
     assert.equal(blockAgain.code, 17);
-    const unblock = await handlers[METHOD_UNBLOCK_FULL]({ token: login.token, addresses: ['192.0.2.10'] }, ctx);
+    const unblock = await callHandler(METHOD_UNBLOCK_FULL, { token: login.token, addresses: ['192.0.2.10'] }, ctx);
     assert.equal(unblock.code, 0);
-    const unblockAgain = await handlers[METHOD_UNBLOCK_FULL]({ token: login.token, addresses: ['192.0.2.10'] }, ctx);
+    const unblockAgain = await callHandler(METHOD_UNBLOCK_FULL, { token: login.token, addresses: ['192.0.2.10'] }, ctx);
     assert.equal(unblockAgain.code, 1004);
-    const logout = await handlers[METHOD_LOGOUT_FULL]({ token: login.token }, ctx);
+    const logout = await callHandler(METHOD_LOGOUT_FULL, { token: login.token }, ctx);
     assert.equal(logout.code, 0);
     assert.equal(server.requests.map((request) => request.stage).join(','), 'login,block,block,unblock,unblock,logout');
   } finally {

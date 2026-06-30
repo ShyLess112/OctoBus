@@ -36,6 +36,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const createHeaders = (entries = {}) => {
   const map = new Map();
   for (const [key, value] of Object.entries(entries)) {
@@ -365,7 +370,7 @@ test('Logout parses JSON body and rejects non-2xx empty body', async () => {
   });
 
   await rpcdef(buildCtx({ instance_id: instanceId }))[LOGIN_PATH]();
-  const ok = await handlers[METHOD_LOGOUT_FULL]({}, buildCtx({ instance_id: instanceId }));
+  const ok = await callHandler(METHOD_LOGOUT_FULL, {}, buildCtx({ instance_id: instanceId }));
   assert.equal(ok.http_status, 200);
   assert.deepEqual(ok.raw_json.structValue.fields.code, { numberValue: 0 });
 
@@ -381,7 +386,7 @@ test('config and secret aliases supply bindings, timeout, TLS, and headers', asy
     return response(200, JSON.stringify(loginSuccessPayload), { 'set-cookie': ['SID=abc; Path=/'] });
   });
 
-  const result = await handlers[METHOD_LOGIN_FULL]({}, {
+  const result = await callHandler(METHOD_LOGIN_FULL, {}, {
     config: {
       base_url: 'https://198.51.100.1:8443/',
       timeout_ms: 2500,

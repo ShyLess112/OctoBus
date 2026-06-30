@@ -63,8 +63,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const parseAuthority = (authority) => {
   if (!authority) return null;
@@ -464,9 +466,9 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_UPDATE_FULL]: (req, ctx = {}) => handleUpdateAddressGroup(req, ctx),
-  [METHOD_LOGOUT_FULL]: (req, ctx = {}) => handleLogout(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_UPDATE_FULL]: (ctx = {}) => handleUpdateAddressGroup(requestFromContext(ctx), ctx),
+  [METHOD_LOGOUT_FULL]: (ctx = {}) => handleLogout(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

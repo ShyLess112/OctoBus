@@ -129,8 +129,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const resolveTimeoutMs = (ctx = {}) => optionalUint32(ctx.bindings?.timeoutMs) ?? optionalUint32(ctx.limits?.timeoutMs) ?? DEFAULT_TIMEOUT_MS;
 
@@ -423,10 +425,10 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_ADD_PRECISE_BLACK_FULL]: (req, ctx = {}) => addPreciseBlack(req, ctx),
-  [METHOD_DELETE_PRECISE_BLACK_FULL]: (req, ctx = {}) => deletePreciseBlack(req, ctx),
-  [METHOD_ADD_GLOBAL_BLACK_FULL]: (req, ctx = {}) => addGlobalBlack(req, ctx),
-  [METHOD_DELETE_GLOBAL_BLACK_FULL]: (req, ctx = {}) => deleteGlobalBlack(req, ctx),
+  [METHOD_ADD_PRECISE_BLACK_FULL]: (ctx = {}) => addPreciseBlack(requestFromContext(ctx), ctx),
+  [METHOD_DELETE_PRECISE_BLACK_FULL]: (ctx = {}) => deletePreciseBlack(requestFromContext(ctx), ctx),
+  [METHOD_ADD_GLOBAL_BLACK_FULL]: (ctx = {}) => addGlobalBlack(requestFromContext(ctx), ctx),
+  [METHOD_DELETE_GLOBAL_BLACK_FULL]: (ctx = {}) => deleteGlobalBlack(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

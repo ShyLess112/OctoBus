@@ -216,8 +216,10 @@ const resolveCallContext = (ctx = {}) => ({
   },
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const executeOperation = async (ctx = {}, operation) => {
   const callCtx = resolveCallContext(ctx);
@@ -302,7 +304,10 @@ const executeOperation = async (ctx = {}, operation) => {
   return responseBody;
 };
 
-const runOperation = (req = {}, ctx = {}, operation) => executeOperation({ ...ctx, req: { ...(ctx.req || {}), ...(req || {}) } }, operation);
+const runOperation = (req = {}, ctx = {}, operation) => {
+  const request = { ...requestFromContext(ctx), ...(req || {}) };
+  return executeOperation({ ...ctx, req: request, request }, operation);
+};
 
 export function rpcdef(ctx = {}) {
   const callCtx = resolveCallContext(ctx);
@@ -313,8 +318,8 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_FORBID_FULL]: (req, ctx = {}) => runOperation(req, ctx, OPERATION.FORBID),
-  [METHOD_UNFORBID_FULL]: (req, ctx = {}) => runOperation(req, ctx, OPERATION.UNFORBID),
+  [METHOD_FORBID_FULL]: (ctx = {}) => runOperation(requestFromContext(ctx), ctx, OPERATION.FORBID),
+  [METHOD_UNFORBID_FULL]: (ctx = {}) => runOperation(requestFromContext(ctx), ctx, OPERATION.UNFORBID),
 };
 
 export const _test = {

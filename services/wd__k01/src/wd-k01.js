@@ -100,8 +100,10 @@ const resolveCallContext = (ctx = {}) => ({
   },
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const resolveHost = (bindings = {}) => normalizeBaseUrl(pickFirstString([bindings.host, bindings.restBaseUrl, bindings.baseUrl]));
 const resolveUser = (bindings = {}) => pickStringFrom(bindings, ['user', 'username']);
@@ -344,14 +346,16 @@ const withSession = async (ctx = {}, actionFn) => {
 };
 
 const runBlockIP = async (req = {}, ctx = {}) => {
-  const callCtx = resolveCallContext({ ...ctx, req: { ...(ctx.req || {}), ...(req || {}) } });
+  const request = { ...requestFromContext(ctx), ...(req || {}) };
+  const callCtx = resolveCallContext({ ...ctx, req: request, request });
   const params = validateBlockReq(callCtx.req || {});
   const { result, loginRaw, logoutText } = await withSession(callCtx, (login) => handleBlock(callCtx, login.token, params));
   return { ...result, login_raw_json: loginRaw, logout_raw_text: logoutText };
 };
 
 const runUnblockIP = async (req = {}, ctx = {}) => {
-  const callCtx = resolveCallContext({ ...ctx, req: { ...(ctx.req || {}), ...(req || {}) } });
+  const request = { ...requestFromContext(ctx), ...(req || {}) };
+  const callCtx = resolveCallContext({ ...ctx, req: request, request });
   const params = validateUnblockReq(callCtx.req || {});
   const { result, loginRaw, logoutText } = await withSession(callCtx, (login) => handleUnblock(callCtx, login.token, params));
   return { ...result, login_raw_json: loginRaw, logout_raw_text: logoutText };
@@ -366,8 +370,8 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_BLOCK_IP_FULL]: (req, ctx = {}) => runBlockIP(req, ctx),
-  [METHOD_UNBLOCK_IP_FULL]: (req, ctx = {}) => runUnblockIP(req, ctx),
+  [METHOD_BLOCK_IP_FULL]: (ctx = {}) => runBlockIP(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_IP_FULL]: (ctx = {}) => runUnblockIP(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

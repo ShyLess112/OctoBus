@@ -77,8 +77,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx.request ?? ctx.req ?? {};
 
 const optionalUint32 = (value) => {
   const raw = unwrapScalar(value);
@@ -249,7 +251,7 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_SEND_TEXT_FULL]: (req, ctx = {}) => handleSendText(req, ctx),
+  [METHOD_SEND_TEXT_FULL]: (ctx = {}) => handleSendText(requestFromContext(ctx), ctx),
 };
 
 export const _test = {
