@@ -24,6 +24,11 @@ const buildCtx = (overrides = {}) => ({
   metadata: { ...(overrides.metadata || {}) },
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const validRequest = () => ({
   host: 'https://device.example:8447',
   device_name: 'public',
@@ -280,7 +285,7 @@ test('UpdateAddressGroup passes TLS skip flags when configured', async () => {
     };
   };
 
-  await handlers[METHOD_UPDATE_ADDRESS_GROUP_FULL](validRequest(), buildCtx({
+  await callHandler(METHOD_UPDATE_ADDRESS_GROUP_FULL, validRequest(), buildCtx({
     bindings: { skipTlsVerify: true },
   }));
 
@@ -300,7 +305,7 @@ test('config and secret aliases provide defaults while request fields win', asyn
     };
   };
 
-  const result = await handlers[METHOD_UPDATE_ADDRESS_GROUP_FULL]({
+  const result = await callHandler(METHOD_UPDATE_ADDRESS_GROUP_FULL, {
     bookName: 'Request_Book',
     ipv4List: ['198.51.100.10'],
   }, {
@@ -411,7 +416,7 @@ test('fallback branches handle null inputs and minimal failures', async () => {
     throw {};
   };
   await expectGrpcError(
-    () => handlers[METHOD_UPDATE_ADDRESS_GROUP_FULL](validRequest(), { metadata: null }),
+    () => callHandler(METHOD_UPDATE_ADDRESS_GROUP_FULL, validRequest(), { metadata: null }),
     'UNAVAILABLE',
     (err, payload) => assert.equal(payload.reason, 'fetch failed'),
   );

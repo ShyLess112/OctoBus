@@ -264,8 +264,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const resolveCredential = (req = {}, bindings = {}) => {
   const credential = req.credential || req.credentials || {};
@@ -627,8 +629,8 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_BLOCK_FULL]: (req, ctx = {}) => handleBlock(req, ctx),
-  [METHOD_UNBLOCK_FULL]: (req, ctx = {}) => handleUnblock(req, ctx),
+  [METHOD_BLOCK_FULL]: (ctx = {}) => handleBlock(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_FULL]: (ctx = {}) => handleUnblock(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

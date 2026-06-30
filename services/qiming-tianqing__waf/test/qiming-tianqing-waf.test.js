@@ -71,6 +71,11 @@ const buildCtx = (overrides = {}) => ({
   },
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const expectGrpcError = async (fn, legacyCode, checker = () => {}) => {
   let caught;
   try {
@@ -341,7 +346,7 @@ test('executeBlock supports disabled address objects and template overrides thro
     return responses.shift();
   });
 
-  const result = await handlers[METHOD_BLOCK_FULL]({
+  const result = await callHandler(METHOD_BLOCK_FULL, {
     ipList: { values: ['2.2.2.2'] },
     address_object: { disabled: true },
     blacklist: {
@@ -536,7 +541,7 @@ test('logout failures are logged and do not fail the main operation', async () =
 test('mock upstream handles block and unblock lifecycle', async () => {
   const server = await createMockServer();
   try {
-    const blockResult = await handlers[METHOD_BLOCK_FULL]({
+    const blockResult = await callHandler(METHOD_BLOCK_FULL, {
       ip_list: ['192.0.2.10'],
       credential: { base_url: server.url, username: 'demo', password: 'secret' },
       blacklist: { name: 'mock-list', reason: 'integration' },
@@ -548,7 +553,7 @@ test('mock upstream handles block and unblock lifecycle', async () => {
     assert.deepEqual(statusAfterBlock.blocked, ['192.0.2.10']);
     assert.deepEqual(statusAfterBlock.objects, ['addr-192.0.2.10']);
 
-    const unblockResult = await handlers[METHOD_UNBLOCK_FULL]({
+    const unblockResult = await callHandler(METHOD_UNBLOCK_FULL, {
       ip_list: ['192.0.2.10'],
       credential: { base_url: server.url, username: 'demo', password: 'secret' },
       blacklist: { name: 'mock-list' },

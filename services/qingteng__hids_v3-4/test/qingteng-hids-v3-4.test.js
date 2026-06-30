@@ -44,6 +44,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const textResponse = (status, body) => ({
   status,
   ok: status >= 200 && status < 300,
@@ -119,7 +124,7 @@ test('Login uses bindings credentials and returns http_status/raw_body', async (
     return jsonResponse(200, { data: { comId: 'com-1', jwt: 'jwt-1', signKey: 'sign-1' } });
   });
 
-  const res = await handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { skipTlsVerify: true } }));
+  const res = await callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { skipTlsVerify: true } }));
   assert.equal(captured.url, 'https://qt.example.com/v1/api/auth');
   assert.deepEqual(JSON.parse(captured.init.body), { username: 'qt-user', password: 'qt-pass' });
   assert.equal(captured.init.method, 'POST');
@@ -134,37 +139,37 @@ test('Login uses bindings credentials and returns http_status/raw_body', async (
 
 test('input and binding helpers validate required fields', async () => {
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { host: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { host: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /host\/baseUrl is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { username: '', user: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { username: '', user: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /username\/user is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { password: '' } })),
+    () => callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { password: '' } })),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /password is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '', system_type: 'linux' }, buildCtx()),
+    () => callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '', system_type: 'linux' }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /ip is required/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '10.0.0.1', system_type: 'mac' }, buildCtx()),
+    () => callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '10.0.0.1', system_type: 'mac' }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /system_type must be linux or win/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_CREATE_HOST_ISOLATION_FULL]({ agent_ids: [] }, buildCtx()),
+    () => callHandler(METHOD_CREATE_HOST_ISOLATION_FULL, { agent_ids: [] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /agent_ids must be a non-empty array/),
   );
   await expectGrpcError(
-    () => handlers[METHOD_CREATE_HOST_ISOLATION_FULL]({ agent_ids: [' '] }, buildCtx()),
+    () => callHandler(METHOD_CREATE_HOST_ISOLATION_FULL, { agent_ids: [' '] }, buildCtx()),
     'INVALID_ARGUMENT',
     (err) => assert.match(err.message, /non-empty value/),
   );
@@ -203,8 +208,8 @@ test('CreateHostIsolation and DeleteHostIsolation send expected signed bodies', 
     return jsonResponse(200, { code: 0, ok: true });
   });
 
-  await handlers[METHOD_CREATE_HOST_ISOLATION_FULL]({ agent_ids: ['agent-a', { value: 'agent-b' }] }, buildCtx());
-  await handlers[METHOD_DELETE_HOST_ISOLATION_FULL]({ agentIds: { values: ['agent-a'] } }, buildCtx());
+  await callHandler(METHOD_CREATE_HOST_ISOLATION_FULL, { agent_ids: ['agent-a', { value: 'agent-b' }] }, buildCtx());
+  await callHandler(METHOD_DELETE_HOST_ISOLATION_FULL, { agentIds: { values: ['agent-a'] } }, buildCtx());
   assert.equal(calls.filter((call) => call.url.endsWith(UPSTREAM_LOGIN_PATH)).length, 1);
 
   const create = calls.find((call) => call.url.endsWith(UPSTREAM_CREATE_HOST_ISOLATION_PATH));
@@ -236,7 +241,7 @@ test('DeleteHostIsolation retries once after 401 by re-login', async () => {
     return jsonResponse(200, { code: 0, removed: 1 });
   });
 
-  const res = await handlers[METHOD_DELETE_HOST_ISOLATION_FULL]({ agent_ids: ['agent-a'] }, buildCtx());
+  const res = await callHandler(METHOD_DELETE_HOST_ISOLATION_FULL, { agent_ids: ['agent-a'] }, buildCtx());
   assert.equal(loginCount, 2);
   assert.equal(res.http_status, 200);
   assert.match(res.raw_body, /removed/);
@@ -253,16 +258,16 @@ test('service caches session per instance and host', async () => {
     return jsonResponse(200, { total: 0, rows: [] });
   });
 
-  await handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '10.0.0.1', system_type: 'linux' }, buildCtx());
-  await handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '10.0.0.2', systemType: 'win' }, buildCtx());
-  await handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '10.0.0.3', system_type: 'linux' }, buildCtx({ meta: { instance_id: 'inst-b' } }));
+  await callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '10.0.0.1', system_type: 'linux' }, buildCtx());
+  await callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '10.0.0.2', systemType: 'win' }, buildCtx());
+  await callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '10.0.0.3', system_type: 'linux' }, buildCtx({ meta: { instance_id: 'inst-b' } }));
   assert.equal(calls.filter((call) => call.url.endsWith(UPSTREAM_LOGIN_PATH)).length, 2);
   assert.equal(_test.getCachedSessionCount(), 2);
 });
 
 test('upstream failures are encoded with legacy JSON payloads', async () => {
   setFetch(async () => jsonResponse(401, { message: 'bad credentials' }));
-  await expectRejectPayload(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'PERMISSION_DENIED', 401, /upstream http 401/);
+  await expectRejectPayload(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'PERMISSION_DENIED', 401, /upstream http 401/);
 
   setFetch(async () => jsonResponse(404, { message: 'missing' }));
   await expectRejectPayload(() => _test.runSignedRequest(buildCtx(), ({ host, session }) => ({
@@ -275,20 +280,20 @@ test('upstream failures are encoded with legacy JSON payloads', async () => {
     if (String(url).endsWith(UPSTREAM_LOGIN_PATH)) return jsonResponse(200, { data: { comId: 'com', jwt: 'jwt', signKey: 'key' } });
     return jsonResponse(500, { message: 'internal error' });
   });
-  await expectRejectPayload(() => handlers[METHOD_CREATE_HOST_ISOLATION_FULL]({ agent_ids: ['agent-a'] }, buildCtx()), 'UNAVAILABLE', 500, /upstream http 500/);
+  await expectRejectPayload(() => callHandler(METHOD_CREATE_HOST_ISOLATION_FULL, { agent_ids: ['agent-a'] }, buildCtx()), 'UNAVAILABLE', 500, /upstream http 500/);
 
   setFetch(async () => {
     throw Object.assign(new Error('boom'), { cause: new Error('timeout') });
   });
-  await expectRejectPayload(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNAVAILABLE', 0, /timeout/);
+  await expectRejectPayload(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNAVAILABLE', 0, /timeout/);
 });
 
 test('protocol failures map to UNKNOWN payloads', async () => {
   setFetch(async () => textResponse(200, 'not-json'));
-  await expectRejectPayload(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', 200, /not valid JSON/);
+  await expectRejectPayload(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', 200, /not valid JSON/);
 
   setFetch(async () => jsonResponse(200, { data: { comId: 'com-only' } }));
-  await expectRejectPayload(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', 200, /missing comId\/jwt\/signKey/);
+  await expectRejectPayload(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', 200, /missing comId\/jwt\/signKey/);
 
   setFetch(async () => ({
     status: 200,
@@ -297,7 +302,7 @@ test('protocol failures map to UNKNOWN payloads', async () => {
       throw new Error('body stream broken');
     },
   }));
-  await expectRejectPayload(() => handlers[METHOD_LOGIN_FULL]({}, buildCtx()), 'UNKNOWN', 200, /body stream broken/);
+  await expectRejectPayload(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNKNOWN', 200, /body stream broken/);
 });
 
 test('helper functions cover edge cases and aliases', () => {
@@ -359,18 +364,18 @@ test('mock upstream handles signed query and isolation lifecycle', async () => {
       meta: { instance_id: 'mock-inst' },
     });
 
-    const login = await handlers[METHOD_LOGIN_FULL]({}, ctx);
+    const login = await callHandler(METHOD_LOGIN_FULL, {}, ctx);
     assert.equal(login.http_status, 200);
 
-    const query = await handlers[METHOD_QUERY_HOST_ASSETS_FULL]({ ip: '192.0.2.10', system_type: 'linux' }, ctx);
+    const query = await callHandler(METHOD_QUERY_HOST_ASSETS_FULL, { ip: '192.0.2.10', system_type: 'linux' }, ctx);
     assert.equal(query.http_status, 200);
     assert.match(query.raw_body, /linux-192.0.2.10/);
 
-    const create = await handlers[METHOD_CREATE_HOST_ISOLATION_FULL]({ agent_ids: ['agent-1'], remark: 'manual' }, ctx);
+    const create = await callHandler(METHOD_CREATE_HOST_ISOLATION_FULL, { agent_ids: ['agent-1'], remark: 'manual' }, ctx);
     assert.equal(create.http_status, 200);
     assert.match(create.raw_body, /manual/);
 
-    const del = await handlers[METHOD_DELETE_HOST_ISOLATION_FULL]({ agent_ids: ['agent-1'] }, ctx);
+    const del = await callHandler(METHOD_DELETE_HOST_ISOLATION_FULL, { agent_ids: ['agent-1'] }, ctx);
     assert.equal(del.http_status, 200);
     assert.match(del.raw_body, /removed/);
 

@@ -38,6 +38,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const makeResponse = ({ status = 200, body = '{}', setCookies, headers } = {}) => ({
   status,
   headers: headers || {
@@ -197,7 +202,7 @@ test('parseable HTTP errors return OK payloads with status and raw fields', asyn
   });
 
   await rpcdef(buildCtx({ instance_id: inst }))[LOGIN_PATH]();
-  const result = await handlers['Nsfocus_NIPS_V56R11.Nsfocus_NIPS_V56R11/BlockIP']({ ip: '203.0.113.10' }, buildCtx({ instance_id: inst }));
+  const result = await callHandler('Nsfocus_NIPS_V56R11.Nsfocus_NIPS_V56R11/BlockIP', { ip: '203.0.113.10' }, buildCtx({ instance_id: inst }));
 
   assert.equal(result.http_status, 500);
   assert.equal(result.code, 7000);
@@ -336,7 +341,7 @@ test('config and secret aliases supply bindings, timeout, and headers', async ()
     });
   });
 
-  const result = await handlers[METHOD_LOGIN_FULL]({}, {
+  const result = await callHandler(METHOD_LOGIN_FULL, {}, {
     config: {
       base_url: 'http://config.example/',
       timeout_ms: 2500,

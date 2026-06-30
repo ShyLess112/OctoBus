@@ -34,6 +34,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const okResponse = (body) => ({
   ok: true,
   status: 200,
@@ -139,7 +144,7 @@ test('Login reads config and secret aliases with default language and timeout fa
     return okResponse('{"success":true}');
   };
 
-  const result = await handlers[METHOD_LOGIN_FULL]({}, {
+  const result = await callHandler(METHOD_LOGIN_FULL, {}, {
     bindings: {},
     config: { base_url: 'https://device.example:8443///', user: 'fallback-user', timeout_ms: 0 },
     secret: { password: 'fallback-pass' },
@@ -312,7 +317,7 @@ test('QueryAddrGroup sends GET with legacy query JSON', async () => {
     }));
   };
 
-  const result = await handlers[METHOD_QUERY_ADDR_GROUP_FULL]({
+  const result = await callHandler(METHOD_QUERY_ADDR_GROUP_FULL, {
     cookies: { token: 'abc123' },
     name: 'BLOCK_GROUP_01',
     limit: 50,
@@ -353,7 +358,7 @@ test('TLS flags, exported helpers, service wrapper, and method map are wired', a
     return okResponse(JSON.stringify({ success: true }));
   };
 
-  await handlers[METHOD_LOGIN_FULL]({}, buildCtx({ bindings: { skipTlsVerify: true } }));
+  await callHandler(METHOD_LOGIN_FULL, {}, buildCtx({ bindings: { skipTlsVerify: true } }));
 
   assert.equal(captured.init.skipTlsVerify, true);
   assert.equal(captured.init.tlsInsecureSkipVerify, true);
@@ -448,7 +453,7 @@ test('fallback branches handle alternate context shapes and transport defaults',
     assert.equal(JSON.parse(captured.init.body)[0].ip[0].netmask, '32');
 
     await expectLegacyGrpcError(
-      () => handlers[METHOD_CREATE_ADDR_GROUP_FULL]({
+      () => callHandler(METHOD_CREATE_ADDR_GROUP_FULL, {
         cookie: { token: { value: 'abc123' } },
         addr_groups: [{ name: 'test' }],
       }, {

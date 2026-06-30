@@ -67,8 +67,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const normalizeBaseUrl = (value) => {
   const raw = toTrimmedString(value);
@@ -332,10 +334,10 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, { ...ctx, req }),
-  [METHOD_CREATE_ADDR_GROUP_FULL]: (req, ctx = {}) => handleCreateAddrGroup(req, { ...ctx, req }),
-  [METHOD_UPDATE_ADDR_GROUP_FULL]: (req, ctx = {}) => handleUpdateAddrGroup(req, { ...ctx, req }),
-  [METHOD_QUERY_ADDR_GROUP_FULL]: (req, ctx = {}) => handleQueryAddrGroup(req, { ...ctx, req }),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_CREATE_ADDR_GROUP_FULL]: (ctx = {}) => handleCreateAddrGroup(requestFromContext(ctx), ctx),
+  [METHOD_UPDATE_ADDR_GROUP_FULL]: (ctx = {}) => handleUpdateAddrGroup(requestFromContext(ctx), ctx),
+  [METHOD_QUERY_ADDR_GROUP_FULL]: (ctx = {}) => handleQueryAddrGroup(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

@@ -190,8 +190,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const fetchJson = async (ctx = {}, url, init = {}) => {
   const callCtx = resolveCallContext(ctx);
@@ -397,10 +399,10 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_QUERY_BLACKLIST_FULL]: (req, ctx = {}) => handleQueryBlacklist(req, ctx),
-  [METHOD_BLOCK_IP_FULL]: (req, ctx = {}) => handleBlockIP(req, ctx),
-  [METHOD_UNBLOCK_IP_FULL]: (req, ctx = {}) => handleUnblockIP(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_QUERY_BLACKLIST_FULL]: (ctx = {}) => handleQueryBlacklist(requestFromContext(ctx), ctx),
+  [METHOD_BLOCK_IP_FULL]: (ctx = {}) => handleBlockIP(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_IP_FULL]: (ctx = {}) => handleUnblockIP(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

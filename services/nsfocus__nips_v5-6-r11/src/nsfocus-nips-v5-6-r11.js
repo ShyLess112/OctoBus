@@ -61,8 +61,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const resolveBaseUrl = (bindings) => normalizeBaseUrl(firstDefined(
   bindings?.host,
@@ -428,11 +430,11 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_BLOCK_FULL]: (req, ctx = {}) => handleBlockIP(req, ctx),
-  [METHOD_LIST_FULL]: (req, ctx = {}) => handleListBlacklist(req, ctx),
-  [METHOD_UNBLOCK_FULL]: (req, ctx = {}) => handleUnblockByIds(req, ctx),
-  [METHOD_APPLY_FULL]: (req, ctx = {}) => handleApplyConfig(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_BLOCK_FULL]: (ctx = {}) => handleBlockIP(requestFromContext(ctx), ctx),
+  [METHOD_LIST_FULL]: (ctx = {}) => handleListBlacklist(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_FULL]: (ctx = {}) => handleUnblockByIds(requestFromContext(ctx), ctx),
+  [METHOD_APPLY_FULL]: (ctx = {}) => handleApplyConfig(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

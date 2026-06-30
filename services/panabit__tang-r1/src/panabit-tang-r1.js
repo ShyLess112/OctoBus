@@ -66,8 +66,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const resolveBaseUrl = (bindings) => normalizeBaseUrl(firstDefined(
   bindings?.restBaseUrl,
@@ -382,11 +384,11 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_LIST_IPTABLE_FULL]: (req, ctx = {}) => handleListIPTable(req, ctx),
-  [METHOD_ADD_IPTABLE_FULL]: (req, ctx = {}) => handleAddIPTable(req, ctx),
-  [METHOD_BLOCK_IP_FULL]: (req, ctx = {}) => handleBlockIP(req, ctx),
-  [METHOD_UNBLOCK_IP_FULL]: (req, ctx = {}) => handleUnblockIP(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_LIST_IPTABLE_FULL]: (ctx = {}) => handleListIPTable(requestFromContext(ctx), ctx),
+  [METHOD_ADD_IPTABLE_FULL]: (ctx = {}) => handleAddIPTable(requestFromContext(ctx), ctx),
+  [METHOD_BLOCK_IP_FULL]: (ctx = {}) => handleBlockIP(requestFromContext(ctx), ctx),
+  [METHOD_UNBLOCK_IP_FULL]: (ctx = {}) => handleUnblockIP(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

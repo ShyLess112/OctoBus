@@ -267,8 +267,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const toPositiveTimeout = (value) => {
   const timeout = Number(unwrapScalar(value));
@@ -334,8 +336,8 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_BLOCK_IP_FULL]: (req, ctx = {}) => callAction(ctx, req, 'add'),
-  [METHOD_UNBLOCK_IP_FULL]: (req, ctx = {}) => callAction(ctx, req, 'delete'),
+  [METHOD_BLOCK_IP_FULL]: (ctx = {}) => callAction(ctx, requestFromContext(ctx), 'add'),
+  [METHOD_UNBLOCK_IP_FULL]: (ctx = {}) => callAction(ctx, requestFromContext(ctx), 'delete'),
 };
 
 export const _test = {

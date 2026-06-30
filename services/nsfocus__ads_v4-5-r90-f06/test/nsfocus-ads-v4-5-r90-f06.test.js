@@ -25,6 +25,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const setFetch = (impl) => {
   globalThis.fetch = impl;
 };
@@ -116,7 +121,7 @@ test('BlockIP uses binding timeout, custom headers, TLS flags, IPv6 and alias fi
     };
   });
 
-  const result = await handlers[METHOD_BLOCK_IP_FULL]({ Ip: '2001:db8::1' }, buildCtx({
+  const result = await callHandler(METHOD_BLOCK_IP_FULL, { Ip: '2001:db8::1' }, buildCtx({
     bindings: {
       baseUrl: 'http://localhost:18081/',
       restBaseUrl: undefined,
@@ -279,7 +284,7 @@ test('config and secret aliases supply bindings', async () => {
     };
   });
 
-  const result = await handlers[METHOD_UNBLOCK_IP_FULL]({ ip: '1.1.1.1' }, {
+  const result = await callHandler(METHOD_UNBLOCK_IP_FULL, { ip: '1.1.1.1' }, {
     config: {
       rest_base_url: 'http://localhost:18081',
       timeout_ms: 2500,

@@ -202,8 +202,10 @@ const resolveCallContext = (ctx = {}) => ({
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
   metadata: ctx.metadata ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const pickRequestOrBinding = (req, bindings, requestKeys, bindingKeys = requestKeys) =>
   firstDefined(pickFirst(req, requestKeys), pickFirst(bindings, bindingKeys));
@@ -363,7 +365,7 @@ export function rpcdef(ctx) {
 }
 
 export const handlers = {
-  [METHOD_UPDATE_ADDRESS_GROUP_FULL]: (req, ctx = {}) => handleUpdateAddressGroup(req, ctx),
+  [METHOD_UPDATE_ADDRESS_GROUP_FULL]: (ctx = {}) => handleUpdateAddressGroup(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

@@ -110,8 +110,10 @@ const resolveCallContext = (ctx = {}) => ({
   bindings: mergedBindings(ctx),
   limits: ctx.limits ?? {},
   meta: ctx.meta ?? {},
-  req: ctx.req ?? ctx.request ?? {},
+  req: ctx.request ?? ctx.req ?? {},
 });
+
+const requestFromContext = (ctx = {}) => ctx?.request ?? ctx?.req ?? {};
 
 const resolveTimeoutMs = (ctx = {}) => firstDefined(
   optionalUint32(ctx.limits?.timeoutMs),
@@ -448,10 +450,10 @@ export function rpcdef(ctx = {}) {
 }
 
 export const handlers = {
-  [METHOD_LOGIN_FULL]: (req, ctx = {}) => handleLogin(req, ctx),
-  [METHOD_QUERY_HOST_ASSETS_FULL]: (req, ctx = {}) => handleQueryHostAssets(req, ctx),
-  [METHOD_CREATE_HOST_ISOLATION_FULL]: (req, ctx = {}) => handleCreateHostIsolation(req, ctx),
-  [METHOD_DELETE_HOST_ISOLATION_FULL]: (req, ctx = {}) => handleDeleteHostIsolation(req, ctx),
+  [METHOD_LOGIN_FULL]: (ctx = {}) => handleLogin(requestFromContext(ctx), ctx),
+  [METHOD_QUERY_HOST_ASSETS_FULL]: (ctx = {}) => handleQueryHostAssets(requestFromContext(ctx), ctx),
+  [METHOD_CREATE_HOST_ISOLATION_FULL]: (ctx = {}) => handleCreateHostIsolation(requestFromContext(ctx), ctx),
+  [METHOD_DELETE_HOST_ISOLATION_FULL]: (ctx = {}) => handleDeleteHostIsolation(requestFromContext(ctx), ctx),
 };
 
 export const _test = {

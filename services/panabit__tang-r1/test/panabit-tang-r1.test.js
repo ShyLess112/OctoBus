@@ -40,6 +40,11 @@ const buildCtx = (overrides = {}) => ({
   req: overrides.req || {},
 });
 
+const callHandler = (method, request = {}, ctx = {}) => {
+  const handler = handlers[method];
+  return handler({ ...ctx, request });
+};
+
 const makeResponse = ({ ok = true, status = 200, body = '{}', contentType = 'application/json' } = {}) => ({
   ok,
   status,
@@ -177,9 +182,9 @@ test('AddIPTable, BlockIP, and UnblockIP send expected multipart actions', async
     return makeResponse({ body: JSON.stringify({ code: 0, msg: 'success' }) });
   });
 
-  const add = await handlers[METHOD_ADD_IPTABLE_FULL]({ api_token: 'token123', Name: 'NewGroup' }, buildCtx());
+  const add = await callHandler(METHOD_ADD_IPTABLE_FULL, { api_token: 'token123', Name: 'NewGroup' }, buildCtx());
   const block = await rpcdef(buildCtx({ req: { api_token: 'token123', Name: 'BlockGroup', Id: '1024', Ip: '203.0.113.10' } }))[BLOCK_IP_PATH]();
-  const unblock = await handlers[METHOD_UNBLOCK_IP_FULL]({ apiToken: 'token123', name: 'BlockGroup', id: '1024', ip: '::1' }, buildCtx());
+  const unblock = await callHandler(METHOD_UNBLOCK_IP_FULL, { apiToken: 'token123', name: 'BlockGroup', id: '1024', ip: '::1' }, buildCtx());
 
   assert.equal(add.code, 0);
   assert.equal(block.code, 0);
@@ -248,7 +253,7 @@ test('config and secret aliases supply base URL, credentials, timeout, and heade
     return makeResponse({ body: JSON.stringify({ code: 0, data: 'token' }) });
   });
 
-  const result = await handlers[METHOD_LOGIN_FULL]({}, {
+  const result = await callHandler(METHOD_LOGIN_FULL, {}, {
     config: {
       base_url: 'http://config.example/',
       timeout_ms: 2500,
