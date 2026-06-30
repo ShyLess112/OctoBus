@@ -411,14 +411,14 @@
       - `npm run pack:check` 输出 npm 的 `.gitignore` fallback warning 和 dry-run tarball 文件名，但最终污染审计无 artifact。
     - 下一目标：任务 6.2。
 
-- [ ] 6.2 运行 recursive import 验证
+- [x] 6.2 运行 recursive import 验证
   - 依赖：任务 6.1。
   - 工作内容：
     - 构建 `bin/octobus`。
     - 使用 `services/scripts/import-check-all.mjs` 递归导入 services distribution，验证 service ID、ServiceRoot 和 NodeEntry。
   - 可并行子任务：
-    - [ ] 可并行：`task build` 构建验证。
-    - [ ] 可并行：import check 失败日志审计。
+    - [x] 可并行：`task build` 构建验证。
+    - [x] 可并行：import check 失败日志审计。
   - 测试方案：
     - `task build`
     - `cd services && npm run import:check -- --octobus ../bin/octobus`
@@ -426,10 +426,23 @@
     - `bin/octobus` 构建成功且静态链接检查通过。
     - recursive import check 对 50 个 service 通过。
   - 完成总结：
-    - 状态：待完成。
-    - 变更：待完成。
-    - 验证：待完成。
-    - 审计与例外：待完成。
+    - 状态：已完成。`bin/octobus` 构建和 services recursive import check 均通过。
+    - 变更：
+      - 本任务未修改 service 源码、package 文件、proto、schema、service name、bin 配置或 dispatcher mapping；仅记录 recursive import 验证证据。
+      - `bin/octobus` 作为 ignored 本地构建输出保留在工作区，用于 import check 和后续仓库级门禁。
+    - 验证：
+      - `task build`：首次在本地默认环境失败，错误为 `GOSUMDB=off` 导致 `golang.org/toolchain@v0.0.1-go1.26.1.linux-amd64` 无法通过 checksum database 校验。
+      - `GOSUMDB=sum.golang.org go env GOSUMDB GONOSUMDB GOTOOLCHAIN GOVERSION GOPROXY`：确认重跑环境为 `GOSUMDB=sum.golang.org`、`GONOSUMDB=git.in.chaitin.net`、`GOTOOLCHAIN=auto`、`GOVERSION=go1.26.1`、`GOPROXY=http://goproxy.dev.in.chaitin.net,direct`。
+      - `GOSUMDB=sum.golang.org task build`：通过，生成 `bin/octobus`。
+      - `test -x bin/octobus && file bin/octobus`：确认 `bin/octobus` 为可执行的静态链接 Linux ELF。
+      - `cd services && npm run import:check -- --octobus ../bin/octobus`：通过，输出 `import checks passed for 50 services`。
+      - `git status --short`：验证后无输出。
+      - `git ls-files --others --exclude-standard`：验证后无输出。
+      - `find services -maxdepth 2 \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.log' -o -name '.env' -o -name 'coverage' -o -name 'package-lock.json' \) -print | sort`：无输出。
+    - 审计与例外：
+      - `GOSUMDB=off` 是本地环境限制，不是本次 services SDK 升级引入的构建失败；后续 Go/Task 门禁如遇相同问题，使用命令级 `GOSUMDB=sum.golang.org` 记录并重跑。
+      - `bin/octobus` 为 ignored build output，未进入 `git status` 或提交范围。
+      - recursive import check 覆盖 50 个 service root 的 service ID、ServiceRoot 和 NodeEntry 导入路径；未发现 SDK 0.6.0 dependency 或 helper 迁移导致的 import 回归。
     - 下一目标：任务 6.3。
 
 - [ ] 6.3 条件运行全量 service coverage
