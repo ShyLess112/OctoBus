@@ -1,13 +1,8 @@
-import { GrpcError, grpcStatus } from '@chaitin-ai/octobus-sdk';
+import { GrpcError, grpcCodeFor } from '@chaitin-ai/octobus-sdk';
 
 export const METHOD_SEND_TEXT_PATH = '/Slack_GroupRobot.Slack_GroupRobot/SendTextMessage';
 export const METHOD_SEND_TEXT_FULL = 'Slack_GroupRobot.Slack_GroupRobot/SendTextMessage';
 export const DEFAULT_TIMEOUT_MS = 5000;
-
-const grpcCodeFor = (code) => ({
-  INVALID_ARGUMENT: grpcStatus.INVALID_ARGUMENT,
-  UNAVAILABLE: grpcStatus.UNAVAILABLE,
-})[code] ?? grpcStatus.UNKNOWN;
 
 const errorWithCode = (code, message) => {
   const err = new GrpcError(grpcCodeFor(code), message);

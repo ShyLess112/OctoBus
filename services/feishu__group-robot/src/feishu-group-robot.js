@@ -1,15 +1,10 @@
-import { GrpcError, grpcStatus } from '@chaitin-ai/octobus-sdk';
+import { GrpcError, grpcCodeFor } from '@chaitin-ai/octobus-sdk';
 import { Agent } from 'undici';
 
 export const METHOD_SEND_TEXT_PATH = '/Feishu_GroupRobot.Feishu_GroupRobot/SendTextMessage';
 export const METHOD_SEND_TEXT_FULL = 'Feishu_GroupRobot.Feishu_GroupRobot/SendTextMessage';
 export const DEFAULT_TIMEOUT_MS = 5000;
 export const SUCCESS_STATUS_CODES = new Set([200, 209, 210]);
-
-const grpcCodeFor = (code) => ({
-  INVALID_ARGUMENT: grpcStatus.INVALID_ARGUMENT,
-  UNAVAILABLE: grpcStatus.UNAVAILABLE,
-})[code] ?? grpcStatus.UNKNOWN;
 
 const errorWithCode = (code, message) => {
   const err = new GrpcError(grpcCodeFor(code), message);

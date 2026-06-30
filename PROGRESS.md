@@ -263,7 +263,7 @@
 
 参考文档：[实施计划 阶段 4](docs/plan/services-sdk-0-6-upgrade-implementation-plan.md#阶段-4迁移通用-context-和错误构造-helper)
 
-- [ ] 4.1 迁移 A 类 context 和错误 helper
+- [x] 4.1 迁移 A 类 context 和错误 helper
   - 依赖：任务 3.1。
   - 工作内容：
     - 对 A 类 service 使用 SDK `grpcCodeFor` 或 `serviceError` 替换本地状态码表，保留既有 message shape、`legacyCode`、`details`、`response` 或 `httpStatus`。
@@ -271,9 +271,9 @@
     - 对 metadata helper 候选使用 `getMetadataValue(ctx, key)`，只替换不改变 key 优先级的代码。
     - 不修改 public handler signature。
   - 可并行子任务：
-    - [ ] 可并行：按 service root 分片迁移 context merge。
-    - [ ] 可并行：按 service root 分片迁移状态码 helper。
-    - [ ] 可并行：按 service root 分片补充或调整 focused tests。
+    - [x] 可并行：按 service root 分片审计 context merge 并记录本批不迁移原因。
+    - [x] 可并行：按 service root 分片迁移状态码 helper。
+    - [x] 可并行：按 service root 分片补充或调整 focused tests。
   - 测试方案：
     - 对每个修改的 service 运行：
       - `cd services && npm run validate -- --service-dir <service-dir>`
@@ -287,10 +287,30 @@
     - `services/scripts/validate-service-package.mjs` 未发现双参数 exported handler。
     - 覆盖率门禁对每个修改 service 通过。
   - 完成总结：
-    - 状态：待完成。
-    - 变更：待完成。
-    - 验证：待完成。
-    - 审计与例外：待完成。
+    - 状态：已完成。按 3.1 候选清单迁移首批 A 类错误 helper；未迁移 context merge。
+    - 变更：
+      - `services/dingtalk__group-robot/src/dingtalk-group-robot.js`：从 SDK 直接导入 `grpcCodeFor`，删除本地 `grpcStatus` 状态表；保留 `errorWithCode` message 和 `legacyCode`。
+      - `services/feishu__group-robot/src/feishu-group-robot.js`：从 SDK 直接导入 `grpcCodeFor`，删除本地 `grpcStatus` 状态表；保留 `errorWithCode` message 和 `legacyCode`。
+      - `services/slack__group-robot/src/slack-group-robot.js`：从 SDK 直接导入 `grpcCodeFor`，删除本地 `grpcStatus` 状态表；保留 `errorWithCode` message 和 `legacyCode`。
+      - 未修改 handler signature、proto、schema、service name、bin、dispatcher mapping、runtime mode、timeout/TLS/response 读取或业务 payload。
+    - 验证：
+      - `cd services && npm run validate -- --service-dir dingtalk__group-robot`：通过。
+      - `cd services && npm test -- --service-dir dingtalk__group-robot`：通过，34 tests pass。
+      - `cd services && npm test -- --coverage --service-dir dingtalk__group-robot`：通过，all files line 99.73%、branch 92.02%、funcs 95.56%。
+      - `cd services && npm run validate -- --service-dir feishu__group-robot`：通过。
+      - `cd services && npm test -- --service-dir feishu__group-robot`：通过，29 tests pass。
+      - `cd services && npm test -- --coverage --service-dir feishu__group-robot`：通过，all files line 100.00%、branch 92.81%、funcs 98.53%。
+      - `cd services && npm run validate -- --service-dir slack__group-robot`：通过。
+      - `cd services && npm test -- --service-dir slack__group-robot`：通过，33 tests pass。
+      - `cd services && npm test -- --coverage --service-dir slack__group-robot`：通过，all files line 99.62%、branch 90.97%、funcs 95.83%。
+      - `cd services && npm run validate`：通过，输出 `service package naming checks passed`。
+      - `cd services && npm test`：通过，19 package-level Node tests pass。
+      - `rg -n "const grpcCodeFor|function grpcCodeFor" services/dingtalk__group-robot/src/dingtalk-group-robot.js services/feishu__group-robot/src/feishu-group-robot.js services/slack__group-robot/src/slack-group-robot.js || true`：无输出。
+      - `find services -maxdepth 2 \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.log' -o -name '.env' -o -name 'coverage' -o -name 'package-lock.json' \) -print | sort`：无输出。
+    - 审计与例外：
+      - 未迁移 `mergedBindings` / `mergeConfigSecret`：3.1 已确认 47 个 merge 命中都涉及 `ctx.bindings` 兼容层，且本批三个 service 的测试要求 secret 覆盖 bindings；机械替换会改变优先级。
+      - 未补新测试：既有 focused tests 已覆盖 `legacyCode`、unknown code fallback、HTTP/network/read failure 和 bindings 优先级；本次仅删除本地状态表并复用 SDK `grpcCodeFor`。
+      - `npm test` 和 coverage 输出中的 validator 错误文本来自 package validator fixture 的预期非法场景，最终结果均为 pass。
     - 下一目标：任务 5.1。
 
 ## 5. 迁移 HTTP Timeout、TLS 和 Response 读取 Helper
