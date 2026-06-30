@@ -370,17 +370,17 @@
 
 参考文档：[实施计划 阶段 6](docs/plan/services-sdk-0-6-upgrade-implementation-plan.md#阶段-6全量-services-门禁和-import-验证)
 
-- [ ] 6.1 运行全量 services 质量门禁
+- [x] 6.1 运行全量 services 质量门禁
   - 依赖：任务 2.3；如果执行 helper 迁移，还依赖任务 4.1 和任务 5.1。
   - 工作内容：
     - 清理 `services/package-lock.json`、`services/node_modules/`、`*.tgz`、日志、coverage、临时 data dir、`.env`。
     - 运行全量 services validate/test/pack check。
     - 确认 `rg '"@chaitin-ai/octobus-sdk": "\\^0\\.5\\.0"' services` 无结果。
   - 可并行子任务：
-    - [ ] 可并行：生成物污染清理和审计。
-    - [ ] 可并行：全量 validate。
-    - [ ] 可并行：全量 test。
-    - [ ] 可并行：pack check。
+    - [x] 可并行：生成物污染清理和审计。
+    - [x] 可并行：全量 validate。
+    - [x] 可并行：全量 test。
+    - [x] 可并行：pack check。
   - 测试方案：
     - `cd services && npm run validate`
     - `cd services && npm test`
@@ -392,10 +392,23 @@
     - 没有新增 service root、proto、schema、bin 或 dispatcher mapping 变化。
     - 没有应忽略生成物出现在待提交变更中。
   - 完成总结：
-    - 状态：待完成。
-    - 变更：待完成。
-    - 验证：待完成。
-    - 审计与例外：待完成。
+    - 状态：已完成。全量 services validate、test、pack dry-run 和 SDK 0.5 残留检查均通过。
+    - 变更：
+      - 本任务未修改 service 源码或 package 文件；仅记录全量 services 门禁证据。
+      - 保持 `services/node_modules` 作为 ignored 本地测试依赖，当前安装的 `@chaitin-ai/octobus-sdk` 为 `0.6.0`。
+    - 验证：
+      - `git status --short`：任务开始前无输出。
+      - `find services -maxdepth 2 \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.log' -o -name '.env' -o -name 'coverage' -o -name 'package-lock.json' \) -print | sort`：任务开始和结束均无输出。
+      - `node -e 'const p=require("./services/node_modules/@chaitin-ai/octobus-sdk/package.json"); console.log(p.version)'`：输出 `0.6.0`。
+      - `cd services && npm run validate`：通过，输出 `service package naming checks passed`。
+      - `cd services && npm test`：通过，19 package-level Node tests pass。
+      - `cd services && npm run pack:check`：通过，`npm pack --dry-run` 完成。
+      - `rg '"@chaitin-ai/octobus-sdk": "\\^0\\.5\\.0"' services || true`：无输出。
+      - `git ls-files --others --exclude-standard`：无输出。
+    - 审计与例外：
+      - 未删除 `services/node_modules`，因为全量 services test 和 pack dry-run 需要本地依赖；该目录被 `.gitignore` 覆盖，未进入 `git status` 或提交范围。
+      - `npm test` 输出的 validator 错误文本来自非法 fixture 场景，最终结果为 pass。
+      - `npm run pack:check` 输出 npm 的 `.gitignore` fallback warning 和 dry-run tarball 文件名，但最终污染审计无 artifact。
     - 下一目标：任务 6.2。
 
 - [ ] 6.2 运行 recursive import 验证
