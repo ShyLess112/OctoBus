@@ -189,7 +189,7 @@ const classifyAlibabaError = (err) => {
 
 const safeAlibabaMessage = (method, err) => {
   const code = err?.code ? `${err.code}: ` : '';
-  const message = err?.data?.Message || err?.description || err?.message || `${method} failed`;
+  const message = err?.description || err?.message || `${method} failed`;
   if (typeof message !== 'string') return `${code}${method} failed`;
   return `${code}${message.replace(/https?:\/\/\S+/g, '[REDACTED_URL]')}`;
 };
@@ -214,7 +214,6 @@ const callAlibaba = async (ctx, method, request) => {
       aliyun_code: err?.code,
       request_id: err?.requestId ?? err?.data?.RequestId,
       status_code: err?.statusCode,
-      data: err?.data,
     });
   }
 };
@@ -424,10 +423,15 @@ export const rpcdef = (ctx = {}) => ({
 });
 
 export const _test = {
+  classifyAlibabaError,
   compactObject,
   normalizeFirewallRule,
   normalizeRuleInput,
   normalizeRuleProtocol,
   requirePort,
+  resolveTimeoutMs,
+  safeAlibabaMessage,
+  toInt,
+  toPositiveInt,
   toValue,
 };

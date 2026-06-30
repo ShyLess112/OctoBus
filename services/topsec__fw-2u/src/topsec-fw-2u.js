@@ -576,6 +576,7 @@ export const _test = {
   makeTimeoutSignal,
   normalizeCookie,
   normalizeHost,
+  pickFirstToken,
   readIpList,
   readResponseBodyText,
   readString,

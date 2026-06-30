@@ -179,9 +179,10 @@ const logFlow = (ctx = {}, action, details) => {
 };
 
 const throwForHttpStatus = (status, text) => {
-  if (status === 401 || status === 403) throw errorWithCode('PERMISSION_DENIED', `upstream http ${status}: ${text}`);
-  if (status >= 400 && status < 500) throw errorWithCode('FAILED_PRECONDITION', `upstream http ${status}: ${text}`);
-  throw errorWithCode('UNAVAILABLE', `upstream http ${status}: ${text}`);
+  const summary = `upstream http ${status}; body_length=${String(text || '').length}`;
+  if (status === 401 || status === 403) throw errorWithCode('PERMISSION_DENIED', summary);
+  if (status >= 400 && status < 500) throw errorWithCode('FAILED_PRECONDITION', summary);
+  throw errorWithCode('UNAVAILABLE', summary);
 };
 
 const parseJsonBody = (text) => {

@@ -5,7 +5,7 @@ This package preserves legacy gRPC package and method names where applicable.
 Import it into OctoBus with:
 
 ```bash
-octobus service import --id hillstone-fw-v5-5-r10 ./services//hillstone__fw_v5-5-r10
+octobus service import --id hillstone-fw-v5-5-r10 ./services/hillstone__fw_v5-5-r10
 ```
 
 ## Package Files
@@ -65,3 +65,29 @@ npm run validate -- --service-dir hillstone__fw_v5-5-r10
 npm test -- --service-dir hillstone__fw_v5-5-r10 --coverage
 npm run pack:check
 ```
+
+## Service Contract
+
+- Service name: `hillstone-fw-v5-5-r10`
+- Service dir: `services/hillstone__fw_v5-5-r10`
+- Runtime mode: `long-running`
+- Config: `host` with explicit port is required; `username`, `timeoutMs`, `skipTlsVerify`, and `headers` are optional.
+- Secret: `password` is required; `username` or `user` may be supplied in secret.
+- RPC read/write properties:
+  - `Login`: write/session setup, logs in and caches the device session.
+  - `AddAddressGroup`: write, adds an address-group definition.
+  - `OverwriteAddressGroup`: write, replaces an address-group definition.
+  - `QueryAddressGroup`: read, queries an address group by name and pagination fields.
+
+OctoBus example:
+
+```bash
+octobus service import --id hillstone-fw-v5-5-r10 ./services/hillstone__fw_v5-5-r10
+octobus instance create hillstone-fw-v5-5-r10 hillstone-r10-demo --config config.json --secret secret.json
+octobus capset create security-devices
+octobus capset add-instance security-devices hillstone-r10-demo
+```
+
+Connect path example: `/capsets/security-devices/connect/hillstone-r10-demo/HILLSTONE_FW_V55R10.HILLSTONE_FW_V55R10/QueryAddressGroup`.
+
+Known limitations: address-group RPCs require a prior `Login`. Some legacy successful responses expose non-sensitive response body structure for compatibility; login tokens, cookies, and raw login bodies are not returned. `skipTlsVerify` is per request.

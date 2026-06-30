@@ -230,7 +230,7 @@ test('HTTP and transport failures map to legacy gRPC codes', async () => {
     [404, 'FAILED_PRECONDITION'],
     [500, 'UNAVAILABLE'],
   ]) {
-    setFetch(async () => makeResponse({ ok: false, status, body: `http ${status}`, contentType: 'text/plain' }));
+    setFetch(async () => makeResponse({ ok: false, status, body: `http ${status} api_token=leaked-panabit-token`, contentType: 'text/plain' }));
     await expectGrpcError(
       () => {
         const ctx = buildCtx();
@@ -238,7 +238,12 @@ test('HTTP and transport failures map to legacy gRPC codes', async () => {
         return rpcdef(ctx)[LIST_IPTABLE_PATH]();
       },
       code,
-      (err) => assert.match(err.message, new RegExp(`upstream http ${status}`)),
+      (err) => {
+        assert.match(err.message, new RegExp(`upstream http ${status}`));
+        assert.match(err.message, /body_length=/);
+        assert.doesNotMatch(err.message, /leaked-panabit-token/);
+        assert.doesNotMatch(err.message, /api_token/);
+      },
     );
   }
 

@@ -332,12 +332,16 @@ test('HTTP and network errors map to gRPC status codes', async () => {
   ];
 
   for (const [status, code, pattern] of cases) {
-    globalThis.fetch = async () => responseWithStatus(status, JSON.stringify({ message: 'error' }));
+    const sensitiveBody = JSON.stringify({ message: 'error', token: 'leaked-fortinet-token' });
+    globalThis.fetch = async () => responseWithStatus(status, sensitiveBody);
     await assert.rejects(
       () => rpcdef(buildCtx({ req: { ip: '203.0.113.10' } }))[GET_ADDRESS_PATH](),
       (err) => {
         assert.equal(err.code, code);
         assert.match(err.message, pattern);
+        assert.match(err.message, /body_length=/);
+        assert.doesNotMatch(err.message, /leaked-fortinet-token/);
+        assert.doesNotMatch(err.message, /"token"/);
         return true;
       },
     );
@@ -501,6 +505,21 @@ test('helper functions keep legacy-compatible edge behavior', async () => {
   assert.ok(tlsOptions.dispatcher);
   assert.equal(Object.hasOwn(tlsOptions, 'tlsInsecureSkipVerify'), false);
   assert.deepEqual(await _test.buildTlsOptions({}), {});
+  const parent = new AbortController();
+  let parentSignalSeen = false;
+  globalThis.fetch = async (_url, init) => {
+    parentSignalSeen = init.signal instanceof AbortSignal;
+    return okResponse(JSON.stringify({ status: 'success', http_status: 200 }));
+  };
+  await _test.fetchWithTimeout('https://device.example/api', { signal: parent.signal }, { timeoutMs: 100 });
+  assert.equal(parentSignalSeen, true);
+  const aborted = new AbortController();
+  aborted.abort('already-aborted');
+  globalThis.fetch = async (_url, init) => {
+    assert.equal(init.signal.aborted, true);
+    return okResponse(JSON.stringify({ status: 'success', http_status: 200 }));
+  };
+  await _test.fetchWithTimeout('https://device.example/api', { signal: aborted.signal }, { timeoutMs: 100 });
   assert.equal(_test.toBool('yes'), true);
   assert.equal(_test.toBool('off'), false);
   assert.equal(_test.toBool({}), true);

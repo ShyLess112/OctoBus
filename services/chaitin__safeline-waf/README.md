@@ -2,10 +2,14 @@
 
 This package preserves legacy gRPC package and method names where applicable.
 
+- Service name: `safeline-waf`
+- Service dir: `chaitin__safeline-waf`
+- Runtime mode: `long-running`
+
 Import it into OctoBus with:
 
 ```bash
-octobus service import --id safeline-waf ./services//chaitin__safeline-waf
+octobus service import --id safeline-waf ./services/chaitin__safeline-waf
 ```
 
 ## Package Files
@@ -62,19 +66,31 @@ Deprecated request `api_token` / `apiToken` and deprecated config token fields a
 ## Behavior Notes
 
 - `AggregateDetectLogBySrcIP` calls `GET /api/DetectLogAggregateView`.
-- IP group CRUD calls `/api/IPGroupAPI`.
-- IP group item add/delete calls `/api/EditIPGroupItem`.
-- Detector state calls `/api/EnableDisableDetectorAPI`.
+- Read RPCs: `AggregateDetectLogBySrcIP`, `ListIPGroups`, and `GetDetectorState`.
+- Write RPCs: `CreateIPGroup`, `UpdateIPGroup`, `DeleteIPGroup`, `AddIPGroupItems`, `DeleteIPGroupItems`, `BlockIP`, `UnblockIP`, and `UpdateDetectorState`.
+- IP group CRUD calls `/api/IPGroupAPI`; IP group item add/delete calls `/api/EditIPGroupItem`; detector state calls `/api/EnableDisableDetectorAPI`.
 - HTTP 401/403 maps to `PERMISSION_DENIED`.
 - Other HTTP 4xx responses map to `FAILED_PRECONDITION`.
 - HTTP 5xx, network, and TLS failures map to `UNAVAILABLE`.
 - Non-JSON success bodies map to `UNKNOWN`.
+- Timeout uses AbortController and `skipTlsVerify` uses a per-request dispatcher. Errors do not return the API token or complete upstream raw body.
+
+## OctoBus Example
+
+```bash
+octobus instance create safeline-waf-prod --service safeline-waf \
+  --config-json '{"endpoint":"https://safeline.example.com","timeoutMs":1500}' \
+  --secret-json '{"apiToken":"replace-with-safeline-token"}'
+octobus capset create safeline-read --name "SafeLine Read"
+octobus capset add-instance safeline-read safeline-waf-prod
+```
 
 ## Local Checks
 
 ```bash
 cd services
 npm run validate -- --service-dir chaitin__safeline-waf
+npm test -- --service-dir chaitin__safeline-waf
 npm test -- --service-dir chaitin__safeline-waf --coverage
 npm run pack:check
 ```

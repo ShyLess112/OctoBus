@@ -392,6 +392,7 @@ test('helpers cover scalar, URL, timeout, headers, body, response, and fallback 
   assert.equal(sanitized.rawBody, '');
   assert.deepEqual(sanitized.bodyJson, {});
   assert.equal(new URL(sanitized.effectiveUrl).searchParams.get('password'), 'REDACTED');
+  assert.equal(_test.normalizeResponse(200, [], '{}', 'not a url', { sanitizeUrl: true }).effectiveUrl, '');
   assert.equal(_test.errorWithCode('NOT_REAL', 'fallback').code, grpcStatus.UNKNOWN);
 });
 

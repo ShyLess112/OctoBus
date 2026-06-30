@@ -13,6 +13,19 @@ function buildServer() {
     if (url.pathname === "/down") {
       res.writeHead(500); res.end("down"); return;
     }
+    if (url.pathname === "/not-json") {
+      res.writeHead(200, { "Content-Type": "text/plain" }); res.end("not-json"); return;
+    }
+    if (url.pathname === "/bad-request") {
+      res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "bad cve" })); return;
+    }
+    if (url.pathname === "/slow") {
+      setTimeout(() => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ data: [] }));
+      }, 50);
+      return;
+    }
 
     const cve = url.searchParams.get("cve");
     if (!cve) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "missing cve param" })); return; }
@@ -28,9 +41,12 @@ export async function createMockServer() {
   const server = buildServer();
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  return {
-    url: `http://127.0.0.1:${address.port}/epss`,
-    downUrl: `http://127.0.0.1:${address.port}/down`,
+    return {
+      url: `http://127.0.0.1:${address.port}/epss`,
+      badRequestUrl: `http://127.0.0.1:${address.port}/bad-request`,
+      downUrl: `http://127.0.0.1:${address.port}/down`,
+    notJsonUrl: `http://127.0.0.1:${address.port}/not-json`,
+    slowUrl: `http://127.0.0.1:${address.port}/slow`,
     close: () => new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     }),

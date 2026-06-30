@@ -2,6 +2,10 @@
 
 FIRST Exploit Prediction Scoring System API wrapper — CVE 利用概率评分与百分位排名。
 
+- Service name: `first-epss-v1`
+- Service dir: `first__epss-v1`
+- Runtime mode: `on-demand`
+
 ## 支持版本
 
 | 组件 | 版本 | 说明 |
@@ -37,6 +41,8 @@ EPSS does not require credentials. The service declares a strict empty secret sc
 
 批量查询 CVE 的 EPSS 利用概率。
 
+RPC read/write 属性：`GetScores` 是只读 unary RPC，对应 `GET /data/v1/epss?cve=...&limit=...`，不会修改上游 FIRST 数据。
+
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | **请求** `cveIds` | []string | CVE 编号列表（最多约 30 个/请求） |
@@ -48,7 +54,8 @@ EPSS does not require credentials. The service declares a strict empty secret sc
 
 **错误码**：
 - `INVALID_ARGUMENT` — cveIds 为空或包含非字符串元素
-- `UNAVAILABLE` — EPSS 服务不可用（HTTP 5xx）
+- `DEADLINE_EXCEEDED` — 请求超过 `timeoutMs`
+- `UNAVAILABLE` — EPSS 服务不可用（HTTP 5xx、网络错误、非 JSON 响应或 body 读取失败）
 
 **请求示例**：
 
@@ -97,6 +104,8 @@ Content-Type: application/json
 - EPSS 数据约每日更新，新 CVE（< 24h）可能无评分
 - 批量请求建议控制在 30 个 CVE 以内
 - EPSS 概率是统计预测，真实利用情况参考 CISA KEV（`cisa__kev` 服务）
+- 该服务没有 secret，也不支持 `skipTlsVerify`；请使用可信系统 CA 访问 HTTPS FIRST API
+- 错误不会包含 secret 或完整 raw response body；EPSS 无认证凭据
 
 ## 建议 capset
 

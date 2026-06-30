@@ -159,6 +159,46 @@ test('CallKibanaAPI supports generic POST body, content type, and space prefix',
   assert.equal(captured.init.body, '{"attributes":{"title":"logs-*"}}');
 });
 
+test('CallKibanaAPI write path accepts single SDK ctx and keeps credentials out of errors', async () => {
+  const secret = 'kibana-secret-password';
+  let captured;
+  setFetch(async (url, init) => {
+    captured = { url: String(url), init };
+    return response(500, {
+      message: `upstream failed with ${secret}`,
+      token: 'raw-upstream-token',
+    });
+  });
+
+  await expectGrpcError(
+    () => handlers[METHOD_CALL_KIBANA_API_FULL]({
+      request: {
+        method: 'POST',
+        path: '/api/saved_objects/index-pattern',
+        body: '{"attributes":{"title":"logs-*"}}',
+      },
+      config: {
+        endpoint: 'http://kibana.local:8443',
+        spaceId: 'default',
+      },
+      secret: {
+        username: 'elastic',
+        password: secret,
+      },
+    }),
+    'UNAVAILABLE',
+    (err) => {
+      assert.equal(captured.url, 'http://kibana.local:8443/s/default/api/saved_objects/index-pattern');
+      assert.equal(captured.init.method, 'POST');
+      assert.equal(captured.init.body, '{"attributes":{"title":"logs-*"}}');
+      assert.equal(captured.init.headers.Authorization, `Basic ${Buffer.from(`elastic:${secret}`).toString('base64')}`);
+      assert.equal(err.response.http_body, '');
+      assert.ok(err.response.http_body_length > 0);
+      assert.doesNotMatch(JSON.stringify(err), /kibana-secret-password|raw-upstream-token/);
+    },
+  );
+});
+
 test('CallKibanaAPI supports rpcdef, HEAD, and content type override', async () => {
   let captured;
   setFetch(async (url, init) => {

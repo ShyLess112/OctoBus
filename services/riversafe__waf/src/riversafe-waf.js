@@ -299,11 +299,11 @@ const syncIPBlacklist = async (req = {}, ctx = {}) => {
 
   const text = await res.text();
   if (!TRANSPORT_SUCCESS_CODES.has(res.status)) {
-    const excerpt = text.length > 256 ? `${text.slice(0, 256)}...` : text;
-    logFlow(meta, 'SyncIPBlacklist:transport_error', { http_status: res.status, response: excerpt });
-    if (res.status === 401 || res.status === 403) throw errorWithCode('PERMISSION_DENIED', `upstream http ${res.status}: ${excerpt}`);
-    if (res.status >= 400 && res.status < 500) throw errorWithCode('FAILED_PRECONDITION', `upstream http ${res.status}: ${excerpt}`);
-    throw errorWithCode('UNAVAILABLE', `upstream http ${res.status}: ${excerpt}`);
+    const summary = `upstream http ${res.status}; body_length=${text.length}`;
+    logFlow(meta, 'SyncIPBlacklist:transport_error', { http_status: res.status, body_length: text.length });
+    if (res.status === 401 || res.status === 403) throw errorWithCode('PERMISSION_DENIED', summary);
+    if (res.status >= 400 && res.status < 500) throw errorWithCode('FAILED_PRECONDITION', summary);
+    throw errorWithCode('UNAVAILABLE', summary);
   }
 
   if (!String(text || '').trim()) {

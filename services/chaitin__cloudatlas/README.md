@@ -38,6 +38,8 @@ The service exposes CloudAtlas asset, seed, vulnerability, monitoring, leak inte
 
 Representative read methods include `ListEnterpriseSubjects`, `ListSubdomains`, `ListDNS`, `ListIPs`, `ListVulnerabilities`, `ListGithubLeaks`, and `ListTaskInstances`. Write methods include batch create/update/delete operations for CloudAtlas resources and should be exposed only to trusted capsets.
 
+All RPCs are unary. Read RPCs use CloudAtlas `GET` list/detail APIs. Write RPCs use CloudAtlas batch create, update, delete, task creation, or monitoring-rule creation APIs and can change upstream asset-management state.
+
 ## Local Checks
 
 ```bash
@@ -49,7 +51,7 @@ npm test -- --service-dir chaitin__cloudatlas
 ## OctoBus Example
 
 ```bash
-octobus service import cloudatlas ./services//chaitin__cloudatlas
+octobus service import cloudatlas ./services/chaitin__cloudatlas
 octobus instance create cloudatlas-prod --service cloudatlas \
   --config-json '{"baseUrl":"https://cloudatlas.example.com","timeoutMs":15000}' \
   --secret-json '{"token":"cloudatlas-api-token"}'
@@ -57,10 +59,11 @@ octobus capset create asm --name "Attack Surface"
 octobus capset add-instance asm cloudatlas-prod
 ```
 
-Call unary RPCs through Connect or gRPC using the method names in `proto/cloudatlas.proto`.
+Call unary RPCs through Connect or gRPC using the method names in `proto/cloudatlas.proto`, for example `POST /capsets/asm/connect/cloudatlas-prod/CloudAtlas.CloudAtlas/ListIPs`.
 
 ## Limits
 
 - `skipTlsVerify` is intended only for private test deployments.
 - Batch create, update, and delete RPCs modify upstream CloudAtlas data.
-- Error handling and timeout behavior are covered by the service tests and will continue to be tightened during the HTTP/TLS remediation stage.
+- Timeout uses AbortController and TLS skip uses a per-request dispatcher; neither behavior disables global TLS verification.
+- Errors do not include the bearer token or complete upstream raw response body.

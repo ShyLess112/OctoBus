@@ -310,13 +310,16 @@ test('UnblockIP requires ids and parses success response', async () => {
   await expectGrpcError(() => callHandler(METHOD_UNBLOCK_IP_FULL, { random: 'request-random', ids: '12' }, cacheRandom(buildCtx())), 'FAILED_PRECONDITION', (err) => {
     assert.match(err.message, /解封IP失败/);
   });
-});
+  });
 
 test('HTTP, empty body, and network errors map to expected codes', async () => {
   for (const [status, code] of [[401, 'PERMISSION_DENIED'], [403, 'PERMISSION_DENIED'], [404, 'FAILED_PRECONDITION'], [503, 'UNAVAILABLE']]) {
-    setFetch(async () => response(status, { errormessage: 'failure' }));
+    setFetch(async () => response(status, { errormessage: 'failure', password: 'ray-leaked-password' }));
     await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), code, (err) => {
       assert.match(err.message, new RegExp(`upstream http ${status}`));
+      assert.match(err.message, /body_length=/);
+      assert.doesNotMatch(err.message, /ray-leaked-password/);
+      assert.doesNotMatch(err.message, /password/);
     });
   }
 
@@ -335,10 +338,11 @@ test('HTTP, empty body, and network errors map to expected codes', async () => {
   setFetch(async () => ({
     status: 500,
     headers: { get: () => 'application/json' },
-    text: async () => JSON.stringify({ errormessage: 'no ok property' }),
+    text: async () => JSON.stringify({ errormessage: 'no ok property', random: 'ray-session-random' }),
   }));
   await expectGrpcError(() => callHandler(METHOD_LOGIN_FULL, {}, buildCtx()), 'UNAVAILABLE', (err) => {
     assert.match(err.message, /upstream http 500/);
+    assert.doesNotMatch(err.message, /ray-session-random/);
   });
 });
 

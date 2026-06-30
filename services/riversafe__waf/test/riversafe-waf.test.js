@@ -184,11 +184,16 @@ test('success path appends signing query params and returns response', async () 
 
 test('transport protocol business and network errors map correctly', async () => {
   for (const [status, legacyCode] of [[401, 'PERMISSION_DENIED'], [403, 'PERMISSION_DENIED'], [404, 'FAILED_PRECONDITION'], [500, 'UNAVAILABLE']]) {
-    setFetch(async () => response(status, { err_no: 1, err_msg: 'bad'.repeat(100) }));
+    setFetch(async () => response(status, { err_no: 1, err_msg: 'bad'.repeat(100), token: 'leaked-riversafe-token' }));
     await expectGrpcError(
       () => callHandler(METHOD_SYNC_FULL, { items: ['1.1.1.1'] }, buildCtx()),
       legacyCode,
-      (err) => assert.match(err.message, new RegExp(`upstream http ${status}`)),
+      (err) => {
+        assert.match(err.message, new RegExp(`upstream http ${status}`));
+        assert.match(err.message, /body_length=/);
+        assert.doesNotMatch(err.message, /leaked-riversafe-token/);
+        assert.doesNotMatch(err.message, /"token"/);
+      },
     );
   }
 

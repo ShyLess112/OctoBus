@@ -1,45 +1,75 @@
 # TopSec FW V3.7.6
 
-This package preserves legacy gRPC package and method names where applicable.
+TopSec FW V3.7.6 WebUI package for REST login, blacklist add/delete, and logout workflows.
 
-## Import
+## Package
 
-```bash
-octobus service import --id topsec-fw-v3-7-6 ./services/topsec__fw_v3-7-6
-```
+- Service name: `topsec-fw-v3-7-6`
+- Service dir: `services/topsec__fw_v3-7-6`
+- Runtime mode: `long-running`
+- Command: `topsec-fw-v3-7-6`
+- Proto service: `TopSec_FW_V376.TopSec_FW_V376`
 
-## Instance Configuration
+## Config And Secret
 
-`config.schema.json` contains non-sensitive connection options:
+Config fields:
 
-- `host`: TopSec FW V3.7.6 WebUI base URL.
-- `memo`: default memo for added blacklist entries.
-- `timeoutMs`: HTTP timeout in milliseconds.
-- `skipTlsVerify` / `tlsInsecureSkipVerify`: compatibility TLS verification controls for private deployments.
-- `allow_http` / `allowHttp`: allow plain HTTP for local mocks or lab environments.
-- `headers`: optional additional HTTP headers.
+- `host` required by runtime, with `baseUrl` and `restBaseUrl` aliases.
+- `memo` optional, default memo for added blacklist entries.
+- `timeoutMs` optional, upstream HTTP timeout in milliseconds.
+- `skipTlsVerify`, `tlsInsecureSkipVerify` optional. TLS verification aliases for private deployments.
+- `allow_http` or `allowHttp` optional. Local mock and lab-only HTTP allowance.
+- `headers` optional, extra upstream headers.
+- `user`, `username`, `aesKey`, and `aesIv` are deprecated compatibility fallbacks. Prefer instance secret.
 
-`secret.schema.json` contains credentials and encryption material:
+Secret fields:
 
-- `username`: WebUI login username.
-- `password`: WebUI login password.
-- `aesKey`: AES key as hex, base64, or UTF-8 text.
-- `aesIv`: AES IV as hex, base64, or UTF-8 text.
+- `username` required.
+- `password` required.
+- `aesKey` required, with `aesKeyHex` and `aesKeyBase64` aliases.
+- `aesIv` required, with `aesIvHex` and `aesIvBase64` aliases.
 
-Legacy request fields `username`, `password`, `aes_key`, and `aes_iv`, plus config fields `user`, `username`, `aesKey`, and `aesIv`, are retained only as deprecated compatibility surface. SDK handlers prefer `ctx.secret` and do not read credential or AES material from `ctx.request`.
+Request `username`, `password`, `aes_key`, `aes_iv`, `session`, `token`, `cookie`, and `secret` fields are deprecated and ignored for credential/session input by SDK handlers.
 
-## Behavior
+## RPCs
 
-- `Login` maps to `POST /home/restLogin/`; it encrypts `password` and `ngtosAuth` internally with AES-CBC zero padding.
-- `AddBlacklistIP`, `DeleteBlacklistIP`, and `Logout` use an internal session cache isolated by service, instance, host, and username.
-- `AddBlacklistIP` and `DeleteBlacklistIP` take the target IP list and optional memo. Request session, token, cookie, and secret fields are deprecated and ignored by SDK handlers.
-- Duplicate entries and already-absent entries are treated as idempotent success where the upstream response clearly indicates that state.
-- Responses and errors do not return upstream raw payloads, raw JSON, cookies, tokens, session secrets, or parsed login payloads.
+| RPC | Access | Upstream behavior |
+| --- | --- | --- |
+| `Login` | Write/session | `POST /home/restLogin/`; encrypts password and `ngtosAuth`, then caches session. |
+| `AddBlacklistIP` | Write | Adds one or more IP addresses and signs commands with `codeRun`. |
+| `DeleteBlacklistIP` | Write | Deletes one or more IP addresses and signs commands with `codeRun`. |
+| `Logout` | Write/session | Logs out and clears the cached session. |
 
-## Local Checks
+Duplicate add and already-absent delete responses are treated as idempotent success when the upstream message clearly indicates that state.
+
+## Local Validation
 
 ```bash
 cd services
 npm run validate -- --service-dir topsec__fw_v3-7-6
 npm test -- --service-dir topsec__fw_v3-7-6
+npm test -- --coverage --service-dir topsec__fw_v3-7-6
 ```
+
+## OctoBus Example
+
+```bash
+octobus service import --id topsec-fw-v3-7-6 ./services/topsec__fw_v3-7-6
+octobus instance create topsec-v376 \
+  --service topsec-fw-v3-7-6 \
+  --config-json '{"host":"https://fw-v376.example.com","timeoutMs":5000,"skipTlsVerify":false}' \
+  --secret-json '{"username":"admin","password":"REDACTED","aesKey":"00112233445566778899aabbccddeeff","aesIv":"0102030405060708090a0b0c0d0e0f10"}'
+octobus capset create security-ops --name security-ops
+octobus capset add-instance security-ops topsec-v376
+
+curl -s -X POST \
+  http://127.0.0.1:9000/capsets/security-ops/connect/topsec-v376/TopSec_FW_V376.TopSec_FW_V376/AddBlacklistIP \
+  -H 'Content-Type: application/json' \
+  -d '{"ip_addresses":["198.51.100.10"],"memo":{"value":"incident test"}}'
+```
+
+## Known Limits
+
+- AES material is device-version specific and must be provisioned as instance secret.
+- All blacklist RPCs are write operations.
+- HTTP allowance is intended only for local mock or lab use.
